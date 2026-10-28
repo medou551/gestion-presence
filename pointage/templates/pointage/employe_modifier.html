@@ -37,8 +37,13 @@
     <h3>Pointage avec son téléphone</h3>
     {% if compte %}
       <p class="aide">Compte : <strong>{{ compte.utilisateur.username }}</strong>{% if not compte.utilisateur.is_active %} (désactivé){% endif %}.
-        L'employé se connecte sur <strong>{{ adresse_site }}</strong> depuis son téléphone et appuie sur « Pointer ».
-        Mot de passe oublié : <em>Comptes → Réinitialiser</em> (administrateur).</p>
+        L'employé se connecte sur <strong>{{ adresse_site }}</strong> depuis son téléphone et appuie sur « Pointer ».</p>
+      <form method="post" action="{% url 'modifier_compte' compte.utilisateur.id %}" class="confirmer"
+            data-question="Créer un nouveau mot de passe temporaire pour {{ compte.utilisateur.username }} ? L'ancien ne marchera plus.">{% csrf_token %}
+        <input type="hidden" name="action" value="reinitialiser">
+        <button type="submit" class="bouton secondaire">Nouveau mot de passe</button>
+      </form>
+      <p class="aide">Le nouveau mot de passe temporaire s'affiche une seule fois (page Comptes). L'employé le changera à sa connexion.</p>
     {% else %}
       <p class="aide">Crée un compte « Employé » : il pourra pointer depuis son téléphone (visage vérifié)
         et consulter ses heures. Un mot de passe temporaire s'affichera une seule fois.</p>
