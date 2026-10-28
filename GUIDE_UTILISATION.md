@@ -94,7 +94,9 @@ Ne laissez pas cet appareil sans surveillance : il est connecté en administrate
 il se connecte avec son identifiant ; ensuite il **reste connecté** sur son téléphone (60 jours).
 
 **Tous les jours**
-1. L'employé ouvre l'**appareil photo** de son téléphone, vise le QR code de la tablette et touche le lien.
+1. L'employé ouvre l'application (icône AlyGo) : le **lecteur de QR code** s'ouvre directement
+   (menu **Scanner**). Il vise le QR code affiché au bureau : il est lu tout seul.
+   (Il peut aussi utiliser l'appareil photo du téléphone et toucher le lien qui apparaît.)
 2. Le téléphone affiche « Bonjour … — Entrée à 08:01:22 » (ou « Au revoir … — Sortie à … »).
 3. **Sortie avant 8 h de travail** : le téléphone demande de confirmer (« Oui, je sors maintenant »).
 4. **Plus de 8 h** : le temps en plus compte comme **heures supplémentaires** ; il apparaît dans le tableau de bord,
