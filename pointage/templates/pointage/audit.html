@@ -1,0 +1,50 @@
+{% extends "pointage/base.html" %}
+{% block titre %}Journal d'audit — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="entete-jour">
+  <h1>Journal d'audit</h1>
+  {% if integre %}
+    <span class="pastille travail" title="Chaque ligne contient l'empreinte de la précédente">✓ Journal intact ({{ info }} entrées)</span>
+  {% else %}
+    <span class="pastille absent">⚠ Journal modifié à partir de la ligne n° {{ info }}</span>
+  {% endif %}
+</div>
+<p class="aide">Toutes les connexions, consultations, exports, modifications et pointages refusés sont enregistrés ici.
+  Ce journal ne peut être ni modifié ni supprimé ; toute altération directe de la base est détectée.</p>
+
+<form method="get" class="ligne-form" style="margin-bottom:14px">
+  <select name="action">
+    <option value="">Toutes les actions</option>
+    {% for code, libelle in actions %}<option value="{{ code }}"{% if action == code %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+  </select>
+  <input type="text" name="qui" value="{{ qui }}" placeholder="Utilisateur…">
+  <button type="submit" class="petit">Filtrer</button>
+  {% if action or qui %}<a href="{% url 'audit' %}" class="bouton secondaire petit">Effacer les filtres</a>{% endif %}
+</form>
+
+<div class="carte tableau-defile">
+  <table>
+    <thead><tr><th>Date</th><th>Utilisateur</th><th>Action</th><th>Détails</th><th>Adresse IP</th></tr></thead>
+    <tbody>
+    {% for l in page %}
+      <tr>
+        <td class="num">{{ l.date|date:"d/m/Y H:i:s" }}</td>
+        <td>{{ l.nom_utilisateur|default:"—" }}{% if l.role %}<br><small class="aide">{{ l.role_libelle }}</small>{% endif %}</td>
+        <td><span class="action action-{{ l.action }}">{{ l.libelle }}</span></td>
+        <td class="details">{{ l.details }}</td>
+        <td>{{ l.adresse_ip|default:"—" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="5" class="vide">Aucune entrée.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if page.has_other_pages %}
+<div class="nav-jour" style="margin-top:12px">
+  {% if page.has_previous %}<a class="bouton secondaire petit" href="?page={{ page.previous_page_number }}&action={{ action }}&qui={{ qui|urlencode }}">← Plus récents</a>{% endif %}
+  <span>Page {{ page.number }} / {{ page.paginator.num_pages }}</span>
+  {% if page.has_next %}<a class="bouton secondaire petit" href="?page={{ page.next_page_number }}&action={{ action }}&qui={{ qui|urlencode }}">Plus anciens →</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

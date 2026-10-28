@@ -1,0 +1,203 @@
+{% extends "pointage/base.html" %}
+{% load static %}
+{% block titre %}Employés — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="entete-jour">
+  <h1>Employés et photos de référence</h1>
+</div>
+
+{% if sans_reference %}
+<p class="alerte">{{ sans_reference }} employé{{ sans_reference|pluralize }} actif{{ sans_reference|pluralize }} sans photo de référence : {{ sans_reference|pluralize:"il ne peut,ils ne peuvent" }} pas pointer.</p>
+{% endif %}
+
+<div class="borne">
+  <section class="carte">
+    <h2 style="margin-top:0" id="titre-panneau">Nouvel employé</h2>
+    <form id="formulaire" autocomplete="off">
+      <div id="champs-nouveau">
+        <label class="champ">Nom complet *<input type="text" id="nom" maxlength="120" required></label>
+        <label class="champ">Poste<input type="text" id="poste" maxlength="100"></label>
+        <label class="champ">Service
+          <select id="service">
+            <option value="">— Aucun —</option>
+            {% for s in services %}<option value="{{ s.id }}">{{ s.nom }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="champ">Code PIN (facultatif, 4 à 8 chiffres)<input type="password" id="pin" inputmode="numeric" maxlength="8" autocomplete="new-password"></label>
+      </div>
+      <p id="info-existant" hidden></p>
+
+      <div class="camera">
+        <video id="video" autoplay playsinline muted></video>
+        <img id="apercu" alt="Photo de référence" hidden>
+        <div class="cadre-visage" aria-hidden="true"></div>
+        <div class="aucune" id="pas-camera" hidden><div><strong>Caméra indisponible</strong><p id="pas-camera-detail"></p>
+          <p>Vous pouvez aussi « Choisir un fichier ».</p>
+          <button type="button" id="reessayer-camera" class="petit">Réessayer</button> <a href="{% url 'diagnostic' %}" class="lien-clair">Diagnostic</a></div></div>
+      </div>
+      <div class="etat-ia" id="etat-ia">Chargement de la reconnaissance faciale…</div>
+
+      <div class="actions">
+        <button type="button" id="prendre" disabled>📷 Prendre la photo</button>
+        <label class="bouton secondaire" for="fichier">Choisir un fichier…</label>
+        <input type="file" id="fichier" accept="image/jpeg,image/png" hidden>
+        <button type="button" class="bouton secondaire" id="recommencer" hidden>Reprendre</button>
+      </div>
+      <button type="submit" class="gros" id="enregistrer" disabled>Enregistrer</button>
+      <button type="button" class="bouton secondaire" id="annuler" hidden style="width:100%;margin-top:8px">Annuler — nouvel employé</button>
+      <div class="message" id="message"></div>
+    </form>
+    <p class="aide">Conseils : visage de face, bien éclairé, sans lunettes de soleil ni casquette. Une seule personne sur la photo.
+      La photo et la signature du visage sont chiffrées sur le serveur.</p>
+  </section>
+
+  <section class="carte">
+    <h2 style="margin-top:0">Liste ({{ employes|length }})</h2>
+    <div class="liste-employes">
+    {% for e in employes %}
+      <div class="ligne-employe{% if not e.actif %} inactif{% endif %}">
+        {% if e.photo_reference %}<img class="photo-ref" src="{% url 'photo_reference' e.id %}" alt="" loading="lazy">{% else %}<div class="photo-ref vide-ref">?</div>{% endif %}
+        <div class="infos">
+          <strong>{{ e.nom }}</strong>{% if e.demande_pin %} 🔒{% endif %}{% if not e.actif %} <span class="pastille absent">Inactif</span>{% endif %}
+          <small>{{ e.poste|default:"—" }}{% if e.service %} · {{ e.service.nom }}{% endif %}{% if e.reference_le %} · photo du {{ e.reference_le|date:"d/m/Y" }}{% endif %}</small>
+        </div>
+        <div class="boutons-ligne">
+          {% if e.actif %}
+          <button type="button" class="bouton secondaire petit" data-id="{{ e.id }}" data-nom="{{ e.nom }}">
+            {% if e.a_reference %}Changer la photo{% else %}Ajouter la photo{% endif %}
+          </button>
+          {% endif %}
+          <a class="bouton secondaire petit" href="{% url 'modifier_employe' e.id %}">Modifier</a>
+        </div>
+      </div>
+    {% empty %}
+      <p class="vide">Aucun employé pour l'instant. Ajoutez le premier avec le formulaire.</p>
+    {% endfor %}
+    </div>
+
+    <h2>Services</h2>
+    <div class="liste-services">
+    {% for s in services %}
+      <form method="post" action="{% url 'supprimer_service' s.id %}" class="service confirmer" data-question="Supprimer le service « {{ s.nom }} » ?">{% csrf_token %}
+        {{ s.nom }} <button type="submit" class="croix" title="Supprimer ce service" aria-label="Supprimer {{ s.nom }}">×</button>
+      </form>
+    {% empty %}<p class="aide" style="margin-top:0">Aucun service.</p>{% endfor %}
+    </div>
+    <form method="post" action="{% url 'ajouter_service' %}" class="ligne-form">{% csrf_token %}
+      <input type="text" name="nom" maxlength="100" placeholder="Nouveau service (ex. Comptabilité)" required>
+      <button type="submit" class="petit">Ajouter</button>
+    </form>
+  </section>
+</div>
+
+<script src="{% static 'pointage/faceapi/face-api.js' %}"></script>
+<script src="{% static 'pointage/visage.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const csrf = "{{ csrf_token }}";
+  const URL_MODELES = "{% static 'pointage/faceapi/modeles' %}";
+  const el = id => document.getElementById(id);
+  const video = el("video"), apercu = el("apercu");
+  let iaPrete = false, cameraPrete = false, employeExistant = null, resultat = null;
+
+  const message = (texte, ok) => { const m = el("message"); m.textContent = texte; m.className = "message " + (ok ? "ok" : "erreur"); };
+  const effacerMessage = () => { el("message").className = "message"; };
+  const majBoutons = () => {
+    el("prendre").disabled = !(iaPrete && cameraPrete) || !!resultat;
+    el("enregistrer").disabled = !resultat;
+    el("recommencer").hidden = !resultat;
+  };
+
+  const etatPret = () => "Reconnaissance faciale prête (" + Visage.libelleMoteur() + ")";
+  Visage.charger(URL_MODELES)
+    .then(() => { iaPrete = true; el("etat-ia").textContent = etatPret(); el("etat-ia").classList.add("pret"); majBoutons(); })
+    .catch(e => { el("etat-ia").textContent = (e && e.message) || "Impossible de charger la reconnaissance faciale."; el("etat-ia").classList.add("erreur"); });
+
+  function demarrerCamera() {
+    el("pas-camera").hidden = true;
+    Visage.ouvrirCamera(video)
+      .then(() => { cameraPrete = true; majBoutons(); })
+      .catch(e => { el("pas-camera-detail").textContent = e.message; el("pas-camera").hidden = false; });
+  }
+  el("reessayer-camera").addEventListener("click", demarrerCamera);
+  demarrerCamera();
+
+  async function analyserCanvas(canvas) {
+    effacerMessage();
+    apercu.src = canvas.toDataURL("image/jpeg", 0.9);
+    apercu.hidden = false; video.hidden = true;
+    el("etat-ia").textContent = "Analyse du visage…";
+    const a = await Visage.analyser(canvas);
+    el("etat-ia").textContent = etatPret();
+    if (!a.ok) { message(a.message, false); recommencer(false); return; }
+    resultat = { canvas, descripteur: a.descripteur };
+    message("Visage détecté. Cliquez sur « Enregistrer ».", true);
+    majBoutons();
+  }
+
+  function recommencer(effacer = true) {
+    resultat = null; apercu.hidden = true; video.hidden = false; el("fichier").value = "";
+    if (effacer) effacerMessage();
+    majBoutons();
+  }
+
+  function modeNouveau() {
+    employeExistant = null;
+    el("titre-panneau").textContent = "Nouvel employé";
+    el("champs-nouveau").hidden = false; el("info-existant").hidden = true; el("annuler").hidden = true;
+    recommencer();
+  }
+
+  el("prendre").addEventListener("click", () => analyserCanvas(Visage.capturer(video)));
+  el("recommencer").addEventListener("click", () => recommencer());
+  el("annuler").addEventListener("click", modeNouveau);
+  el("fichier").addEventListener("change", ev => {
+    const f = ev.target.files[0]; if (!f) return;
+    if (!iaPrete) { message("Patientez : la reconnaissance faciale se charge.", false); return; }
+    const img = new Image();
+    img.onload = () => { analyserCanvas(Visage.canvasDepuisImage(img)); URL.revokeObjectURL(img.src); };
+    img.onerror = () => message("Impossible de lire cette image.", false);
+    img.src = URL.createObjectURL(f);
+  });
+
+  document.querySelectorAll("form.confirmer").forEach(f => f.addEventListener("submit", ev => {
+    if (!window.confirm(f.dataset.question)) ev.preventDefault();
+  }));
+
+  document.querySelectorAll("[data-id]").forEach(b => b.addEventListener("click", () => {
+    employeExistant = { id: b.dataset.id, nom: b.dataset.nom };
+    el("titre-panneau").textContent = "Photo de référence";
+    el("champs-nouveau").hidden = true; el("annuler").hidden = false;
+    el("info-existant").hidden = false; el("info-existant").textContent = "Employé : " + employeExistant.nom;
+    recommencer();
+    el("titre-panneau").scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+
+  el("formulaire").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    if (!resultat) return;
+    const f = new FormData();
+    if (employeExistant) {
+      f.append("employe", employeExistant.id);
+    } else {
+      if (!el("nom").value.trim()) { message("Le nom est obligatoire.", false); el("nom").focus(); return; }
+      f.append("nom", el("nom").value); f.append("poste", el("poste").value);
+      f.append("service", el("service").value); f.append("pin", el("pin").value);
+    }
+    f.append("descripteur", JSON.stringify(resultat.descripteur));
+    f.append("photo", await Visage.enJpeg(resultat.canvas), "reference.jpg");
+    el("enregistrer").disabled = true; el("enregistrer").textContent = "Enregistrement…";
+    try {
+      const r = await fetch("{% url 'enregistrer_employe' %}", { method: "POST", body: f, headers: { "X-CSRFToken": csrf } });
+      const d = await r.json();
+      message(d.message, d.ok);
+      if (d.ok) setTimeout(() => location.reload(), 1200);
+    } catch (e) {
+      message("Erreur de connexion au serveur.", false);
+    } finally {
+      el("enregistrer").textContent = "Enregistrer"; majBoutons();
+    }
+  });
+})();
+</script>
+{% endblock %}

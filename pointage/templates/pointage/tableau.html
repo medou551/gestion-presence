@@ -1,0 +1,134 @@
+{% extends "pointage/base.html" %}
+{% block titre %}Tableau de bord — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="entete-jour">
+  <h1>Présence du {{ jour|date:"l j F Y" }}{% if service_choisi %} · {{ service_choisi.nom }}{% endif %}</h1>
+  <form method="get" class="nav-jour">
+    <a class="bouton secondaire" href="?date={{ veille|date:'Y-m-d' }}{% if service_choisi and services %}&service={{ service_choisi.id }}{% endif %}">← Veille</a>
+    <input type="date" name="date" value="{{ jour|date:'Y-m-d' }}" class="auto-envoi">
+    {% if services %}
+    <select name="service" class="auto-envoi" aria-label="Service">
+      <option value="">Tous les services</option>
+      {% for s in services %}<option value="{{ s.id }}"{% if service_choisi.id == s.id %} selected{% endif %}>{{ s.nom }}</option>{% endfor %}
+    </select>
+    {% endif %}
+    {% if not est_aujourdhui %}<a class="bouton secondaire" href="?date={{ lendemain|date:'Y-m-d' }}{% if service_choisi and services %}&service={{ service_choisi.id }}{% endif %}">Lendemain →</a>
+    <a class="bouton secondaire" href="{% url 'tableau' %}">Aujourd'hui</a>{% endif %}
+  </form>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="valeur">{{ stats.presents }}</div><div class="libelle">Présents</div></div>
+  <div class="stat"><div class="valeur">{{ stats.absents }}</div><div class="libelle">Absents</div></div>
+  <div class="stat"><div class="valeur">{{ stats.retards }}</div><div class="libelle">En retard (après {{ heure_arrivee }})</div></div>
+  <div class="stat"><div class="valeur">{{ stats.total }}</div><div class="libelle">Employés actifs</div></div>
+</div>
+
+<div class="carte tableau-defile">
+  <table>
+    <thead><tr><th>Employé</th><th>Service</th><th>Arrivée</th><th>Départ</th><th>Durée</th><th>Statut</th></tr></thead>
+    <tbody>
+    {% for l in lignes %}
+      <tr>
+        <td class="cellule-employe">{% if l.employe.photo_reference %}<img class="photo-mini rond" src="{% url 'photo_reference' l.employe.id %}" alt="" title="Photo de référence" loading="lazy">{% endif %}{{ l.employe.nom }}</td>
+        <td>{{ l.employe.service.nom|default:"—" }}</td>
+        <td class="num">{% if l.entree %}{% if l.entree.photo %}<img class="photo-mini" src="{% url 'photo_pointage' l.entree.id %}" alt="" loading="lazy">{% endif %} {{ l.entree.horodatage|time:"H:i:s" }}{% else %}—{% endif %}</td>
+        <td class="num">{% if l.sortie %}{% if l.sortie.photo %}<img class="photo-mini" src="{% url 'photo_pointage' l.sortie.id %}" alt="" loading="lazy">{% endif %} {{ l.sortie.horodatage|time:"H:i:s" }}{% else %}—{% endif %}</td>
+        <td class="num">{{ l.duree }}</td>
+        <td>
+          {% if l.statut == "Absent" %}<span class="pastille absent">Absent</span>
+          {% elif l.statut == "Au travail" %}<span class="pastille travail">Au travail</span>
+          {% elif l.statut == "Sortie manquante" %}<span class="pastille retard" title="L'employé n'a pas pointé sa sortie">Sortie manquante</span>
+          {% else %}<span class="pastille parti">Parti</span>{% endif %}
+          {% if l.retard %}<span class="pastille retard">Retard</span>{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="vide">Aucun employé{% if peut_gerer_employes %}. Ajoutez-en dans <a href="{% url 'employes' %}">Employés</a>{% endif %}.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if stats.oublis and peut_corriger %}
+<p class="alerte">{{ stats.oublis }} sortie{{ stats.oublis|pluralize }} manquante{{ stats.oublis|pluralize }} ce jour-là : ajoutez-la{{ stats.oublis|pluralize:",s" }} avec le formulaire « Corriger un oubli » ci-dessous.</p>
+{% endif %}
+
+<h2>Journal des pointages ({{ journal|length }})</h2>
+<div class="carte tableau-defile">
+  {% if journal %}
+  <table>
+    <thead><tr><th>Heure</th><th>Nom</th><th>Type</th><th>Référence / pointage</th><th>Ressemblance</th><th>Borne (IP)</th></tr></thead>
+    <tbody>
+    {% for p in journal %}
+      <tr>
+        <td class="num">{{ p.horodatage|time:"H:i:s" }}</td>
+        <td>{{ p.employe.nom }}</td>
+        <td>{{ p.get_type_display }}{% if p.en_retard %} <span class="pastille retard">Retard</span>{% endif %}
+          {% if p.manuel %}<br><span class="pastille manuel" title="{{ p.motif }}">Manuel</span>{% endif %}</td>
+        {% if p.manuel %}
+        <td colspan="2" class="motif">« {{ p.motif }} »<br><small class="aide">saisi par {{ p.saisi_par.username|default:"?" }}</small>
+          {% if peut_corriger %}
+          <form method="post" action="{% url 'supprimer_pointage_manuel' p.id %}" class="confirmer inline" data-question="Supprimer cette correction ?">{% csrf_token %}
+            <input type="hidden" name="suivant" value="{{ request.get_full_path }}">
+            <button type="submit" class="lien-danger">Supprimer</button>
+          </form>
+          {% endif %}
+        </td>
+        {% else %}
+        <td>{% if p.employe.photo_reference %}<img class="photo-mini" src="{% url 'photo_reference' p.employe.id %}" alt="Référence" loading="lazy">{% endif %}{% if p.photo %}<img class="photo-mini" src="{% url 'photo_pointage' p.id %}" alt="Photo de {{ p.employe.nom }}" loading="lazy">{% else %}<span class="aide">photo supprimée</span>{% endif %}</td>
+        <td class="num">{% if p.ressemblance is not None %}{{ p.ressemblance }} %{% else %}—{% endif %}</td>
+        {% endif %}
+        <td>{{ p.adresse_ip|default:"—" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="vide">Aucun pointage ce jour-là.</p>{% endif %}
+</div>
+{% if peut_corriger %}
+<h2>Corriger un oubli</h2>
+<form method="post" action="{% url 'pointage_manuel' %}" class="carte form-correction">{% csrf_token %}
+  <input type="hidden" name="suivant" value="{{ request.get_full_path }}">
+  <label class="champ">Employé
+    <select name="employe" required>
+      <option value="">— Choisir —</option>
+      {% for l in lignes %}<option value="{{ l.employe.id }}"{% if l.statut == "Sortie manquante" %} data-oubli="1"{% endif %}>{{ l.employe.nom }}{% if l.statut == "Sortie manquante" %} (sortie manquante){% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="champ">Type
+    <select name="type" required><option value="S">Sortie</option><option value="E">Entrée</option></select>
+  </label>
+  <label class="champ">Date<input type="date" name="date" value="{{ jour|date:'Y-m-d' }}" required></label>
+  <label class="champ">Heure<input type="time" name="heure" step="1" value="{% if est_aujourdhui %}{{ heure_actuelle }}{% else %}17:00{% endif %}" required></label>
+  <label class="champ large">Motif (obligatoire)<input type="text" name="motif" maxlength="200" minlength="5" required placeholder="Ex. : oubli de pointage à la sortie, confirmé par le chef de service"></label>
+  <button type="submit">Ajouter la correction</button>
+  <p class="aide large">La correction est marquée « Manuel », avec votre nom et le motif, et enregistrée dans le journal d'audit.
+    Les pointages de la borne ne peuvent pas être modifiés.</p>
+</form>
+{% endif %}
+
+<p class="aide">Les photos des pointages sont chiffrées et supprimées automatiquement après {{ conservation }} jours ; les heures restent.</p>
+
+<form class="export" method="get" action="{% url 'export' %}">
+  <strong>Exporter vers Excel :</strong>
+  du <input type="date" name="du" value="{{ jour|date:'Y-m-01' }}">
+  au <input type="date" name="au" value="{{ jour|date:'Y-m-d' }}">
+  {% if service_choisi and services %}<input type="hidden" name="service" value="{{ service_choisi.id }}">{% endif %}
+  <button type="submit">Télécharger (.xlsx)</button>
+  <span class="aide">L'export est enregistré dans le journal.</span>
+</form>
+
+<div class="zoom" id="zoom"><img alt=""></div>
+<script nonce="{{ request.csp_nonce }}">
+document.querySelectorAll(".auto-envoi").forEach(c => c.addEventListener("change", () => c.form.submit()));
+document.querySelectorAll("form.confirmer").forEach(f => f.addEventListener("submit", ev => {
+  if (!window.confirm(f.dataset.question)) ev.preventDefault();
+}));
+const zoom = document.getElementById("zoom");
+zoom.addEventListener("click", () => { zoom.style.display = "none"; });
+document.querySelectorAll(".photo-mini").forEach(img => img.addEventListener("click", () => {
+  zoom.querySelector("img").src = img.src; zoom.style.display = "flex";
+}));
+</script>
+{% endblock %}

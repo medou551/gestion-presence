@@ -1,0 +1,34 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+      - name: Vérifier la configuration Django
+        run: python manage.py check
+      - name: Vérifier qu'aucune migration ne manque
+        run: python manage.py makemigrations --check --dry-run
+      - name: Lancer les tests (rôles, chiffrement, audit, pointage, base de données…)
+        run: python manage.py test pointage -v 2
+      - name: Vérifier qu'aucun secret n'est dans le dépôt
+        run: |
+          git ls-files | grep -E '(^|/)\.env$|db\.sqlite3|\.sauvegarde$|(^|/)media/' && { echo "Fichier sensible dans le dépôt !"; exit 1; } || echo "Aucun fichier sensible."

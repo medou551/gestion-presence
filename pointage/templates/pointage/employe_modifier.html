@@ -1,0 +1,61 @@
+{% extends "pointage/base.html" %}
+{% block titre %}{{ emp.nom }} — Gestion de présence{% endblock %}
+{% block contenu %}
+<p><a href="{% url 'employes' %}">← Retour aux employés</a></p>
+<div class="borne">
+  <section class="carte">
+    <h1 style="margin-top:0;font-size:22px">{{ emp.nom }}</h1>
+    {% for e in erreurs %}<p class="erreurs">{{ e }}</p>{% endfor %}
+    <form method="post" autocomplete="off">{% csrf_token %}
+      <label class="champ">Nom complet *<input type="text" name="nom" value="{{ emp.nom }}" maxlength="120" required></label>
+      <label class="champ">Poste<input type="text" name="poste" value="{{ emp.poste }}" maxlength="100"></label>
+      <label class="champ">Service
+        <select name="service">
+          <option value="">— Aucun —</option>
+          {% for s in services %}<option value="{{ s.id }}"{% if emp.service_id == s.id %} selected{% endif %}>{{ s.nom }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="champ">Nouveau code PIN (laisser vide pour ne pas changer)
+        <input type="password" name="pin" inputmode="numeric" maxlength="8" autocomplete="new-password"></label>
+      {% if emp.demande_pin %}<label class="case"><input type="checkbox" name="supprimer_pin"> Supprimer le code PIN actuel</label>{% endif %}
+      <label class="case"><input type="checkbox" name="actif"{% if emp.actif %} checked{% endif %}> Actif (peut pointer)</label>
+      <p><button type="submit">Enregistrer</button></p>
+    </form>
+  </section>
+
+  <section class="carte">
+    <h2 style="margin-top:0">Données personnelles</h2>
+    <div class="ligne-employe" style="border:0">
+      {% if emp.photo_reference %}<img class="photo-ref" src="{% url 'photo_reference' emp.id %}" alt="">{% else %}<div class="photo-ref vide-ref">?</div>{% endif %}
+      <div class="infos">
+        <strong>Photo de référence</strong>
+        <small>{% if emp.reference_le %}Enregistrée le {{ emp.reference_le|date:"d/m/Y à H:i" }} (chiffrée){% else %}Aucune{% endif %}</small>
+        <small>{{ emp.pointages.count }} pointage{{ emp.pointages.count|pluralize }} · compte : {% if emp.compte %}{{ emp.compte.utilisateur.username }}{% else %}aucun{% endif %}</small>
+      </div>
+    </div>
+
+    <h3>Départ de l'employé</h3>
+    <p class="aide">Supprime la photo de référence, la signature du visage et toutes les photos de pointage, et désactive l'employé.
+      Les heures de présence sont conservées (obligations de paie).</p>
+    <form method="post" action="{% url 'effacer_biometrie' emp.id %}" class="confirmer"
+          data-question="Effacer définitivement toutes les données biométriques de {{ emp.nom }} ?">{% csrf_token %}
+      <button type="submit" class="danger">Effacer les données biométriques</button>
+    </form>
+
+    {% if est_admin %}
+    <h3>Suppression complète (administrateur)</h3>
+    <p class="aide">Supprime l'employé, ses photos, tous ses pointages et son compte. Irréversible.
+      Tapez exactement « {{ emp.nom }} » pour confirmer.</p>
+    <form method="post" action="{% url 'supprimer_employe' emp.id %}" class="ligne-form">{% csrf_token %}
+      <input type="text" name="confirmation" placeholder="{{ emp.nom }}" required autocomplete="off">
+      <button type="submit" class="danger">Supprimer définitivement</button>
+    </form>
+    {% endif %}
+  </section>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+document.querySelectorAll("form.confirmer").forEach(f => f.addEventListener("submit", ev => {
+  if (!window.confirm(f.dataset.question)) ev.preventDefault();
+}));
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+# Secrets et données — ne jamais partager
+.env
+db.sqlite3*
+*.sauvegarde
+media/
+sauvegardes/
+staticfiles/
+venv/
+__pycache__/
+deploiement/caddy.exe
+deploiement/caddy_data/
+deploiement/caddy_config/
+deploiement/journaux/
+deploiement/Caddyfile
+deploiement/certificat_a_installer_sur_les_postes.crt
+.cache/
+deploiement/wsgi_pythonanywhere.py

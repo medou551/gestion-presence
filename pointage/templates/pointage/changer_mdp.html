@@ -1,0 +1,23 @@
+{% extends "pointage/base.html" %}
+{% block titre %}Mot de passe — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="carte connexion">
+  <h1 style="margin-top:0;font-size:22px">Changer mon mot de passe</h1>
+  {% if user.profil.doit_changer_mdp %}
+    <p class="note info">Pour votre sécurité, choisissez un mot de passe personnel avant de continuer.</p>
+  {% endif %}
+  <form method="post" autocomplete="off">{% csrf_token %}
+    <label for="id_old_password">Mot de passe actuel</label>
+    <input type="password" name="old_password" id="id_old_password" required autocomplete="current-password">
+    {% for e in form.old_password.errors %}<p class="erreurs">{{ e }}</p>{% endfor %}
+    <label for="id_new_password1">Nouveau mot de passe</label>
+    <input type="password" name="new_password1" id="id_new_password1" required autocomplete="new-password">
+    {% for e in form.new_password1.errors %}<p class="erreurs">{{ e }}</p>{% endfor %}
+    <label for="id_new_password2">Confirmer le nouveau mot de passe</label>
+    <input type="password" name="new_password2" id="id_new_password2" required autocomplete="new-password">
+    {% for e in form.new_password2.errors %}<p class="erreurs">{{ e }}</p>{% endfor %}
+    <p class="aide">Au moins 10 caractères, pas uniquement des chiffres, pas trop proche de votre identifiant.</p>
+    <p><button type="submit" style="width:100%">Enregistrer</button></p>
+  </form>
+</div>
+{% endblock %}

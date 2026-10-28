@@ -1,0 +1,47 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="same-origin">
+  <title>{% block titre %}Gestion de présence{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'pointage/style.css' %}">
+</head>
+<body>
+  <header class="barre">
+    <span class="titre">Gestion de présence</span>
+    <nav>
+      {% if user.is_authenticated %}
+        {% if est_borne %}
+          <a href="{% url 'borne' %}">Pointage</a>
+        {% endif %}
+        {% if est_gestion %}
+          <a href="{% url 'tableau' %}">Tableau de bord</a>
+        {% endif %}
+        {% if peut_gerer_employes %}
+          <a href="{% url 'employes' %}">Employés</a>
+        {% endif %}
+        {% if est_admin %}
+          <a href="{% url 'borne' %}">Borne</a>
+          <a href="{% url 'comptes' %}">Comptes</a>
+          <a href="{% url 'audit' %}">Journal</a>
+        {% endif %}
+        {% if est_employe %}
+          <a href="{% url 'mon_espace' %}">Mon espace</a>
+        {% endif %}
+        <span class="qui" title="{{ role_libelle }}">{{ user.get_username }}{% if role_libelle %} · {{ role_libelle }}{% endif %}</span>
+        {% if not est_borne %}<a href="{% url 'changer_mdp' %}">Mot de passe</a>{% endif %}
+        <form method="post" action="{% url 'deconnexion' %}" class="form-deconnexion">{% csrf_token %}
+          <button type="submit" class="lien-bouton">Déconnexion</button>
+        </form>
+      {% endif %}
+    </nav>
+  </header>
+  <main>
+    {% if messages %}
+      {% for m in messages %}<div class="note {% if m.tags %}{{ m.tags }}{% endif %}">{{ m }}</div>{% endfor %}
+    {% endif %}
+    {% block contenu %}{% endblock %}
+  </main>
+</body>
+</html>

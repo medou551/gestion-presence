@@ -1,0 +1,94 @@
+{% extends "pointage/base.html" %}
+{% load static %}
+{% block titre %}Diagnostic du navigateur — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="entete-jour"><h1>Diagnostic du navigateur</h1></div>
+<p class="aide" style="margin-top:0">Cette page vérifie que ce navigateur peut utiliser l'application (caméra et reconnaissance du visage).
+  Elle n'enregistre rien. Fonctionne avec Chrome, Edge, Firefox, Safari, Opera et Samsung Internet récents.</p>
+
+<div class="borne">
+  <section class="carte">
+    <table class="diagnostic">
+      <tbody id="resultats">
+        <tr><td colspan="2" class="aide">Vérification en cours…</td></tr>
+      </tbody>
+    </table>
+    <p><button type="button" id="tester-camera">📷 Tester la caméra</button>
+       <button type="button" id="tester-analyse" class="bouton secondaire">Tester la reconnaissance</button></p>
+    <div class="message" id="message"></div>
+  </section>
+  <section class="carte">
+    <div class="camera">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="aucune" id="pas-camera"><div><p id="pas-camera-detail">Cliquez « Tester la caméra ».</p></div></div>
+    </div>
+    <h3>Adresse à utiliser</h3>
+    <ul class="aide">
+      <li>Sur le PC qui fait tourner le serveur (essai) : <strong>http://127.0.0.1:8000/</strong> ou <strong>http://localhost:8000/</strong></li>
+      <li>Au bureau, après l'installation HTTPS : <strong>https://</strong> suivi de l'adresse du serveur</li>
+      <li>Si un navigateur transforme toujours l'adresse en « https » sur ce PC, essayez l'autre forme (127.0.0.1 ↔ localhost)
+        ou suivez la section « Navigateurs » de LISEZMOI.md.</li>
+    </ul>
+  </section>
+</div>
+
+<script src="{% static 'pointage/faceapi/face-api.js' %}"></script>
+<script src="{% static 'pointage/visage.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const URL_MODELES = "{% static 'pointage/faceapi/modeles' %}";
+  const el = id => document.getElementById(id);
+  const lignes = [];
+  function ligne(ok, titre, detail) {
+    lignes.push({ ok, titre, detail });
+    el("resultats").innerHTML = "";
+    for (const l of lignes) {
+      const tr = document.createElement("tr");
+      const a = document.createElement("td"); a.className = "etat " + (l.ok === true ? "ok" : l.ok === false ? "ko" : "info");
+      a.textContent = l.ok === true ? "✓" : l.ok === false ? "✗" : "•";
+      const b = document.createElement("td");
+      const t = document.createElement("strong"); t.textContent = l.titre; b.appendChild(t);
+      if (l.detail) { const d = document.createElement("div"); d.className = "aide"; d.textContent = l.detail; b.appendChild(d); }
+      tr.append(a, b); el("resultats").appendChild(tr);
+    }
+  }
+  const message = (t, ok) => { const m = el("message"); m.textContent = t; m.className = "message " + (ok ? "ok" : "erreur"); };
+
+  const c = Visage.compatibilite();
+  ligne(null, "Navigateur : " + c.navigateur, navigator.userAgent);
+  ligne(true, "Connexion au serveur", "La page s'est chargée depuis " + c.adresse);
+  ligne(c.contexteSecurise, "Adresse sécurisée pour la caméra",
+        c.contexteSecurise ? "OK (" + location.protocol.replace(":", "") + ")" : Visage.problemeAvantCamera());
+  ligne(c.camera, "Accès à la caméra pris en charge", c.camera ? "" : "Mettez à jour le navigateur.");
+  ligne(c.webgl ? true : null, "Accélération graphique (WebGL)",
+        c.webgl ? "Disponible : analyse rapide." : "Indisponible : l'analyse utilisera le processeur (plus lente, mais fonctionne).");
+  ligne(navigator.cookieEnabled, "Cookies autorisés", navigator.cookieEnabled ? "" : "Autorisez les cookies pour ce site, sinon la connexion est impossible.");
+
+  const t0 = performance.now();
+  Visage.charger(URL_MODELES)
+    .then(m => ligne(true, "Reconnaissance faciale chargée", "Moteur : " + Visage.libelleMoteur() + " — " + Math.round(performance.now() - t0) + " ms"))
+    .catch(e => ligne(false, "Reconnaissance faciale", e.message));
+
+  el("tester-camera").addEventListener("click", () => {
+    el("pas-camera").hidden = false;
+    el("pas-camera-detail").textContent = "Ouverture de la caméra… (acceptez la demande d'autorisation du navigateur si elle apparaît)";
+    Visage.ouvrirCamera(el("video"))
+      .then(() => { el("pas-camera").hidden = true; ligne(true, "Caméra", "Image reçue : la caméra fonctionne."); })
+      .catch(e => { el("pas-camera-detail").textContent = e.message; ligne(false, "Caméra", e.message); });
+  });
+
+  el("tester-analyse").addEventListener("click", async () => {
+    const v = el("video");
+    if (!v.srcObject) { message("Testez d'abord la caméra.", false); return; }
+    try {
+      await Visage.charger(URL_MODELES);
+      const t = performance.now();
+      const r = await Visage.analyser(Visage.capturer(v));
+      const ms = Math.round(performance.now() - t);
+      if (r.ok) { message("Visage détecté en " + ms + " ms. Tout fonctionne dans ce navigateur.", true); ligne(true, "Analyse d'un visage", ms + " ms"); }
+      else { message(r.message + " (analyse en " + ms + " ms)", false); }
+    } catch (e) { message(e.message, false); }
+  });
+})();
+</script>
+{% endblock %}

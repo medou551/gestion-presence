@@ -1,0 +1,9 @@
+{% extends "pointage/base.html" %}
+{% block titre %}Accès refusé — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="carte connexion">
+  <h1 style="margin-top:0;font-size:22px">Accès refusé</h1>
+  <p>Votre rôle ne permet pas d'ouvrir cette page. Cette tentative a été enregistrée.</p>
+  <p><a class="bouton secondaire" href="{% url 'accueil' %}">Retour à mon accueil</a></p>
+</div>
+{% endblock %}

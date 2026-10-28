@@ -1,0 +1,113 @@
+{% extends "pointage/base.html" %}
+{% block titre %}Comptes — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="entete-jour"><h1>Comptes et rôles</h1></div>
+
+{% if mdp_affiche %}
+<div class="note success">
+  Compte <strong>{{ mdp_affiche.0 }}</strong> créé. Mot de passe temporaire : <code class="mdp">{{ mdp_affiche.1 }}</code><br>
+  Notez-le maintenant et remettez-le à la personne : il ne sera plus affiché. Elle devra le changer à sa première connexion.
+</div>
+{% endif %}
+
+<div class="borne">
+  <section class="carte">
+    <h2 style="margin-top:0">Nouveau compte</h2>
+    <form method="post" autocomplete="off" id="form-compte">{% csrf_token %}
+      <label class="champ">Identifiant de connexion *<input type="text" name="identifiant" maxlength="150" required autocapitalize="none"></label>
+      <label class="champ">Rôle *
+        <select name="role" required class="choix-role">
+          <option value="">— Choisir —</option>
+          {% for code, libelle in roles %}<option value="{{ code }}">{{ libelle }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="champ si-chef" hidden>Service dirigé *
+        <select name="service"><option value="">— Choisir —</option>
+          {% for s in services %}<option value="{{ s.id }}">{{ s.nom }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="champ si-employe" hidden>Employé concerné *
+        <select name="employe"><option value="">— Choisir —</option>
+          {% for e in employes_sans_compte %}<option value="{{ e.id }}">{{ e.nom }}</option>{% endfor %}
+        </select>
+      </label>
+      <p class="aide">Un mot de passe temporaire est généré ; il devra être changé à la première connexion.</p>
+      <button type="submit">Créer le compte</button>
+    </form>
+
+    <h3>Les rôles</h3>
+    <table class="roles">
+      <tr><th>Administrateur</th><td>Tout : comptes, services, employés, tableau, exports, journal d'audit.</td></tr>
+      <tr><th>Ressources humaines</th><td>Employés (ajout, photos de référence, effacement), tableau et exports de tous les services.</td></tr>
+      <tr><th>Chef de service</th><td>Tableau et exports de son service uniquement, en lecture seule.</td></tr>
+      <tr><th>Borne de pointage</th><td>Uniquement la page de pointage. À utiliser sur le poste de pointage.</td></tr>
+      <tr><th>Employé</th><td>Uniquement son historique de présence et le téléchargement de ses données.</td></tr>
+    </table>
+  </section>
+
+  <section class="carte tableau-defile">
+    <h2 style="margin-top:0">Comptes ({{ utilisateurs|length }})</h2>
+    <table>
+      <thead><tr><th>Identifiant</th><th>Rôle</th><th>Dernière connexion</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for u in utilisateurs %}
+        <tr{% if not u.is_active %} class="inactif"{% endif %}>
+          <td><strong>{{ u.username }}</strong>{% if u == user %} <span class="aide">(vous)</span>{% endif %}
+            {% if not u.is_active %}<br><span class="pastille absent">Désactivé</span>{% endif %}</td>
+          <td>
+            {% if u.is_superuser %}Administrateur{% elif u.profil %}{{ u.profil.get_role_display }}{% else %}<span class="erreurs">Aucun</span>{% endif %}
+            {% if u.profil.service %}<br><small>{{ u.profil.service.nom }}</small>{% endif %}
+            {% if u.profil.employe %}<br><small>{{ u.profil.employe.nom }}</small>{% endif %}
+          </td>
+          <td class="num">{{ u.last_login|date:"d/m/Y H:i"|default:"jamais" }}</td>
+          <td>
+            {% if u != user %}
+            <details>
+              <summary class="bouton secondaire petit">Gérer</summary>
+              <form method="post" action="{% url 'modifier_compte' u.id %}" class="sous-form">{% csrf_token %}
+                <input type="hidden" name="action" value="role">
+                <select name="role" class="choix-role" required>
+                  {% for code, libelle in roles %}<option value="{{ code }}"{% if u.profil.role == code or code == 'admin' and u.is_superuser and not u.profil %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
+                </select>
+                <select name="service" class="si-chef"><option value="">Service…</option>
+                  {% for s in services %}<option value="{{ s.id }}"{% if u.profil.service_id == s.id %} selected{% endif %}>{{ s.nom }}</option>{% endfor %}
+                </select>
+                <select name="employe" class="si-employe"><option value="">Employé…</option>
+                  {% for e in employes %}<option value="{{ e.id }}"{% if u.profil.employe_id == e.id %} selected{% endif %}>{{ e.nom }}</option>{% endfor %}
+                </select>
+                <button type="submit" class="petit">Changer le rôle</button>
+              </form>
+              <form method="post" action="{% url 'modifier_compte' u.id %}" class="sous-form">{% csrf_token %}
+                <input type="hidden" name="action" value="reinitialiser">
+                <button type="submit" class="bouton secondaire petit">Nouveau mot de passe</button>
+              </form>
+              <form method="post" action="{% url 'modifier_compte' u.id %}" class="sous-form">{% csrf_token %}
+                <input type="hidden" name="action" value="{% if u.is_active %}desactiver{% else %}activer{% endif %}">
+                <button type="submit" class="petit {% if u.is_active %}danger{% endif %}">{% if u.is_active %}Désactiver{% else %}Réactiver{% endif %}</button>
+              </form>
+              <form method="post" action="{% url 'modifier_compte' u.id %}" class="sous-form">{% csrf_token %}
+                <input type="hidden" name="action" value="supprimer">
+                <input type="text" name="confirmation" placeholder="Tapez « {{ u.username }} »" required autocomplete="off" class="petit-champ">
+                <button type="submit" class="petit danger">Supprimer le compte</button>
+              </form>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+<script nonce="{{ request.csp_nonce }}">
+// Affiche le choix du service (chef) ou de l'employé (compte employé) selon le rôle
+document.querySelectorAll(".choix-role").forEach(sel => {
+  const form = sel.form;
+  const maj = () => {
+    form.querySelectorAll(".si-chef").forEach(x => { x.hidden = sel.value !== "chef"; });
+    form.querySelectorAll(".si-employe").forEach(x => { x.hidden = sel.value !== "employe"; });
+  };
+  sel.addEventListener("change", maj); maj();
+});
+</script>
+{% endblock %}

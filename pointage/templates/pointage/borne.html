@@ -1,0 +1,160 @@
+{% extends "pointage/base.html" %}
+{% load static %}
+{% block titre %}Pointage — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="horloge">
+  <div class="heure" id="heure">--:--:--</div>
+  <div class="date" id="date"></div>
+</div>
+
+<div class="borne">
+  <section class="carte">
+    <input type="text" id="recherche" class="recherche" placeholder="Tapez votre nom…" autocomplete="off">
+    <div class="noms" id="noms"></div>
+    <p class="vide" id="aucun" hidden>Aucun employé trouvé.</p>
+  </section>
+
+  <section class="carte">
+    <div class="camera">
+      <video id="video" autoplay playsinline muted></video>
+      <img id="figee" alt="Photo prise" hidden>
+      <div class="cadre-visage" aria-hidden="true"></div>
+      <div class="aucune" id="pas-camera" hidden><div><strong>Caméra indisponible</strong><p id="pas-camera-detail"></p>
+        <button type="button" id="reessayer-camera" class="petit">Réessayer</button> <a href="{% url 'diagnostic' %}" class="lien-clair">Diagnostic</a></div></div>
+    </div>
+    <div class="etat-ia" id="etat-ia">Chargement de la reconnaissance faciale…</div>
+    <div class="selection" id="selection">Choisissez votre nom dans la liste.</div>
+    <div class="zone-pin" id="zone-pin" hidden>
+      <input type="password" id="pin" inputmode="numeric" maxlength="8" placeholder="Code PIN" autocomplete="off">
+    </div>
+    <button class="gros" id="pointer" disabled>Pointer</button>
+    <div class="message" id="message"></div>
+  </section>
+</div>
+
+{{ employes|json_script:"donnees-employes" }}
+<script src="{% static 'pointage/faceapi/face-api.js' %}"></script>
+<script src="{% static 'pointage/visage.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const employes = JSON.parse(document.getElementById("donnees-employes").textContent);
+  const csrf = "{{ csrf_token }}";
+  const fuseau = "{{ fuseau }}";
+  const URL_MODELES = "{% static 'pointage/faceapi/modeles' %}";
+  // Décalage entre l'horloge du serveur et celle de ce poste : on affiche l'heure du serveur
+  const decalage = {{ serveur_ms }} - Date.now();
+
+  const el = id => document.getElementById(id);
+  const video = el("video"), figee = el("figee"), bouton = el("pointer");
+  let choisi = null, occupe = false, minuterie = null, iaPrete = false;
+
+  const peutPointer = () => !!(choisi && choisi.ref && video.srcObject && iaPrete && !occupe);
+  const majBouton = () => { bouton.disabled = !peutPointer(); };
+
+  // ---------- Horloge (h:min:s) ----------
+  const fmtHeure = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: fuseau });
+  const fmtDate = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: fuseau });
+  const tic = () => { const d = new Date(Date.now() + decalage); el("heure").textContent = fmtHeure.format(d); el("date").textContent = fmtDate.format(d); };
+  tic(); setInterval(tic, 250);
+
+  // ---------- Reconnaissance faciale ----------
+  const etatPret = () => "Reconnaissance faciale prête (" + Visage.libelleMoteur() + ")";
+  Visage.charger(URL_MODELES)
+    .then(() => { iaPrete = true; el("etat-ia").textContent = etatPret(); el("etat-ia").classList.add("pret"); majBouton(); })
+    .catch(e => { el("etat-ia").textContent = (e && e.message) || "Impossible de charger la reconnaissance faciale. Rechargez la page."; el("etat-ia").classList.add("erreur"); });
+
+  // ---------- Liste des noms ----------
+  const sansAccent = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const echapper = s => s.replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  function afficherNoms() {
+    const q = sansAccent(el("recherche").value.trim());
+    const liste = el("noms"); liste.innerHTML = "";
+    const trouves = employes.filter(e => !q || sansAccent(e.nom).includes(q));
+    el("aucun").hidden = trouves.length > 0;
+    trouves.forEach(e => {
+      const b = document.createElement("button");
+      b.className = "nom" + (choisi && choisi.id === e.id ? " choisi" : "") + (e.ref ? "" : " sans-ref");
+      b.innerHTML = (e.pin ? '<span class="cadenas" title="Code PIN demandé">🔒</span>' : "") + echapper(e.nom) +
+                    "<small>" + (e.ref ? echapper(e.poste || "") : "Photo de référence manquante") + "</small>";
+      b.onclick = () => choisir(e);
+      liste.appendChild(b);
+    });
+  }
+  function afficherMessage(texte, ok) {
+    const m = el("message"); m.textContent = texte; m.className = "message " + (ok ? "ok" : "erreur");
+  }
+  function choisir(e) {
+    choisi = e;
+    el("selection").textContent = "Employé : " + e.nom;
+    el("zone-pin").hidden = !e.pin || !e.ref;
+    el("pin").value = "";
+    el("message").className = "message";
+    if (!e.ref) afficherMessage("Pas encore de photo de référence pour " + e.nom + ". Voyez le responsable.", false);
+    else if (e.pin) el("pin").focus();
+    majBouton();
+    afficherNoms();
+    // Sur téléphone / petite tablette, la caméra est sous la liste : on y descend
+    if (window.innerWidth < 820) document.querySelector(".camera").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  el("recherche").addEventListener("input", afficherNoms);
+  el("recherche").addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { const premier = document.querySelector(".nom"); if (premier) premier.click(); }
+  });
+  el("pin").addEventListener("keydown", ev => { if (ev.key === "Enter") bouton.click(); });
+  afficherNoms();
+
+  // ---------- Caméra ----------
+  function demarrerCamera() {
+    el("pas-camera").hidden = true;
+    Visage.ouvrirCamera(video)
+      .then(() => { majBouton(); })
+      .catch(e => { el("pas-camera-detail").textContent = e.message; el("pas-camera").hidden = false; majBouton(); });
+  }
+  el("reessayer-camera").addEventListener("click", demarrerCamera);
+  demarrerCamera();
+
+  function reinitialiser() {
+    choisi = null; figee.hidden = true; video.hidden = false;
+    el("selection").textContent = "Choisissez votre nom dans la liste.";
+    el("zone-pin").hidden = true; el("pin").value = ""; el("recherche").value = "";
+    el("message").className = "message";
+    majBouton(); afficherNoms(); el("recherche").focus();
+  }
+
+  // ---------- Pointage : photo → analyse du visage → envoi au serveur ----------
+  bouton.addEventListener("click", async () => {
+    if (!peutPointer()) return;
+    if (choisi.pin && !el("pin").value) { el("pin").focus(); return; }
+    occupe = true; majBouton(); bouton.textContent = "Analyse du visage… ne bougez pas";
+    clearTimeout(minuterie);
+    let reussi = false;
+    try {
+      const canvas = Visage.capturer(video);
+      figee.src = canvas.toDataURL("image/jpeg", 0.9);
+      figee.hidden = false; video.hidden = true;
+
+      const analyse = await Visage.analyser(canvas);
+      if (!analyse.ok) { afficherMessage(analyse.message, false); return; }
+
+      bouton.textContent = "Vérification…";
+      const f = new FormData();
+      f.append("employe", choisi.id);
+      f.append("pin", el("pin").value);
+      f.append("descripteur", JSON.stringify(analyse.descripteur));
+      f.append("photo", await Visage.enJpeg(canvas), "pointage.jpg");
+      const r = await fetch("{% url 'pointer' %}", { method: "POST", body: f, headers: { "X-CSRFToken": csrf } });
+      const d = await r.json();
+      afficherMessage(d.message, d.ok);
+      reussi = d.ok;
+    } catch (e) {
+      afficherMessage("Erreur de connexion au serveur.", false);
+    } finally {
+      occupe = false; bouton.textContent = "Pointer";
+      if (!reussi) { figee.hidden = true; video.hidden = false; }
+      minuterie = setTimeout(reinitialiser, reussi ? 4000 : 6000);
+      majBouton();
+    }
+  });
+})();
+</script>
+{% endblock %}
