@@ -108,8 +108,9 @@ class Lieu(models.Model):
 class Pointage(models.Model):
     ENTREE, SORTIE = "E", "S"
     TYPES = [(ENTREE, "Entrée"), (SORTIE, "Sortie")]
-    BORNE, TELEPHONE = "borne", "telephone"
-    SOURCES = [(BORNE, "Poste de pointage"), (TELEPHONE, "Téléphone de l'employé")]
+    BORNE, TELEPHONE, QR = "borne", "telephone", "qr"
+    SOURCES = [(BORNE, "Poste de pointage"), (TELEPHONE, "Téléphone de l'employé (visage)"),
+               (QR, "QR code de la tablette")]
 
     employe = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name="pointages")
     type = models.CharField(max_length=1, choices=TYPES)
@@ -147,6 +148,8 @@ class Pointage(models.Model):
         if self.manuel:
             par = self.saisi_par.get_username() if self.saisi_par else "?"
             return f"Manuel ({par}) : {self.motif}"
+        if self.source == self.QR:
+            return "QR code (tablette)"
         if self.source == self.TELEPHONE:
             if self.lieu_id and self.distance_lieu_m is not None:
                 return f"Téléphone ({self.distance_lieu_m:.0f} m de {self.lieu.nom})"
@@ -263,6 +266,23 @@ class JournalAudit(models.Model):
         return True, n
 
 
+class Tablette(models.Model):
+    """Tablette du bureau qui affiche le QR code. Elle n'a pas de compte : elle est reconnue par un jeton secret
+    (cookie posé par l'administrateur). Seule l'empreinte du jeton est conservée."""
+    nom = models.CharField(max_length=60)
+    empreinte_jeton = models.CharField(max_length=64, unique=True, editable=False)
+    active = models.BooleanField(default=True)
+    creee_le = models.DateTimeField(auto_now_add=True)
+    derniere_activite = models.DateTimeField(null=True, blank=True)
+    adresse_ip = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["nom"]
+
+    def __str__(self):
+        return self.nom
+
+
 class TacheSysteme(models.Model):
     """Mémorise la dernière exécution des tâches automatiques (purge des photos…)."""
     nom = models.CharField(max_length=50, primary_key=True)
@@ -270,6 +290,10 @@ class TacheSysteme(models.Model):
 
 
 # ---------------------------------------------------------------- Calculs
+
+def heures_supplementaires(secondes):
+    """Secondes travaillées au-delà de la journée normale (HEURES_JOURNEE, 8 h par défaut)."""
+    return max(0, int(secondes - settings.HEURES_JOURNEE * 3600))
 
 def resume_journee(employe, jour):
     """Retourne (premiere_entree, derniere_sortie, secondes_travaillees, entree_ouverte) pour un jour."""

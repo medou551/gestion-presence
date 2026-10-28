@@ -241,10 +241,19 @@ CONNEXION_BLOCAGE_MINUTES = 15             # …le compte et l'adresse sont bloq
 # Délai minimum entre deux pointages d'un même employé (évite les doubles clics)
 POINTAGE_DELAI_MIN_SECONDES = 60
 # Pointage depuis le téléphone de l'employé (compte « Employé » + vérification du visage)
-POINTAGE_TELEPHONE = env_bool("POINTAGE_TELEPHONE", True)
+POINTAGE_TELEPHONE = env_bool("POINTAGE_TELEPHONE", False)  # par défaut : pointage par QR code
 # Réseaux autorisés pour ce pointage, ex. « 41.188.10.25 » (adresse publique du bureau) ou « 192.168.1.0/24 ».
 # Vide = depuis n'importe où (déconseillé : un employé pourrait pointer depuis chez lui).
 POINTAGE_TELEPHONE_RESEAUX = env_liste("POINTAGE_TELEPHONE_RESEAUX", "")
+# Durée normale d'une journée : au-delà, ce sont des heures supplémentaires.
+# Une sortie avant cette durée demande une confirmation (« sortie anticipée »).
+HEURES_JOURNEE = float(env("HEURES_JOURNEE", "8"))
+# QR code de la tablette : renouvelé toutes les 15 s, valable 90 s (une photo du QR envoyée à un collègue
+# ne sert plus à rien quelques instants plus tard)
+QR_RENOUVELLEMENT_SECONDES = 15
+QR_VALIDITE_SECONDES = 90
+# Les employés restent connectés sur leur téléphone (pour scanner sans retaper le mot de passe)
+SESSION_EMPLOYE_JOURS = int(env("SESSION_EMPLOYE_JOURS", "60"))
 # Heure normale d'arrivée : au-delà, l'entrée est marquée « en retard »
 HEURE_ARRIVEE = env("HEURE_ARRIVEE", "08:00")
 # Les photos des pointages sont supprimées après ce nombre de jours (les heures sont conservées)

@@ -21,12 +21,13 @@
   <div class="stat"><div class="valeur">{{ stats.presents }}</div><div class="libelle">Présents</div></div>
   <div class="stat"><div class="valeur">{{ stats.absents }}</div><div class="libelle">Absents</div></div>
   <div class="stat"><div class="valeur">{{ stats.retards }}</div><div class="libelle">En retard (après {{ heure_arrivee }})</div></div>
+  <div class="stat"><div class="valeur num">{{ stats.heures_sup }}</div><div class="libelle">Heures sup. (au-delà de {{ heures_journee|floatformat:"-1" }} h)</div></div>
   <div class="stat"><div class="valeur">{{ stats.total }}</div><div class="libelle">Employés actifs</div></div>
 </div>
 
 <div class="carte tableau-defile">
   <table>
-    <thead><tr><th>Employé</th><th>Service</th><th>Arrivée</th><th>Départ</th><th>Durée</th><th>Statut</th></tr></thead>
+    <thead><tr><th>Employé</th><th>Service</th><th>Arrivée</th><th>Départ</th><th>Durée</th><th>Heures sup.</th><th>Statut</th></tr></thead>
     <tbody>
     {% for l in lignes %}
       <tr>
@@ -35,6 +36,7 @@
         <td class="num">{% if l.entree %}{% if l.entree.photo %}<img class="photo-mini" src="{% url 'photo_pointage' l.entree.id %}" alt="" loading="lazy">{% endif %} {{ l.entree.horodatage|time:"H:i:s" }}{% else %}—{% endif %}</td>
         <td class="num">{% if l.sortie %}{% if l.sortie.photo %}<img class="photo-mini" src="{% url 'photo_pointage' l.sortie.id %}" alt="" loading="lazy">{% endif %} {{ l.sortie.horodatage|time:"H:i:s" }}{% else %}—{% endif %}</td>
         <td class="num">{{ l.duree }}</td>
+        <td class="num">{% if l.sup %}<strong class="sup">+{{ l.sup_txt }}</strong>{% else %}—{% endif %}</td>
         <td>
           {% if l.statut == "Absent" %}<span class="pastille absent">Absent</span>
           {% elif l.statut == "Au travail" %}<span class="pastille travail">Au travail</span>
@@ -44,7 +46,7 @@
         </td>
       </tr>
     {% empty %}
-      <tr><td colspan="6" class="vide">Aucun employé{% if est_admin %}. Ajoutez-en dans <a href="{% url 'employes' %}">Employés</a>{% endif %}.</td></tr>
+      <tr><td colspan="7" class="vide">Aucun employé{% if est_admin %}. Ajoutez-en dans <a href="{% url 'employes' %}">Employés</a>{% endif %}.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -79,7 +81,7 @@
         <td>{% if p.employe.photo_reference %}<img class="photo-mini" src="{% url 'photo_reference' p.employe.id %}" alt="Référence" loading="lazy">{% endif %}{% if p.photo %}<img class="photo-mini" src="{% url 'photo_pointage' p.id %}" alt="Photo de {{ p.employe.nom }}" loading="lazy">{% else %}<span class="aide">photo supprimée</span>{% endif %}</td>
         <td class="num">{% if p.ressemblance is not None %}{{ p.ressemblance }} %{% else %}—{% endif %}</td>
         {% endif %}
-        <td>{% if p.source == "telephone" %}<span class="pastille telephone">📱 Téléphone</span><br>{% if p.lieu %}<small>{{ p.distance_lieu_m|floatformat:0 }} m de {{ p.lieu.nom }}</small><br>{% endif %}{% elif not p.manuel %}Poste de pointage<br>{% endif %}<small class="aide">{{ p.adresse_ip|default:"—" }}</small></td>
+        <td>{% if p.source == "qr" %}<span class="pastille telephone">▦ QR code</span><br>{% if p.lieu %}<small>{{ p.distance_lieu_m|floatformat:0 }} m de {{ p.lieu.nom }}</small><br>{% endif %}{% elif p.source == "telephone" %}<span class="pastille telephone">📱 Téléphone</span><br>{% if p.lieu %}<small>{{ p.distance_lieu_m|floatformat:0 }} m de {{ p.lieu.nom }}</small><br>{% endif %}{% elif not p.manuel %}Poste de pointage<br>{% endif %}<small class="aide">{{ p.adresse_ip|default:"—" }}</small></td>
       </tr>
     {% endfor %}
     </tbody>

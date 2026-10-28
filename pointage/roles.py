@@ -7,6 +7,7 @@
 """
 from functools import wraps
 
+from django.conf import settings
 from django.contrib.auth.views import redirect_to_login
 from django.core.exceptions import PermissionDenied
 
@@ -90,4 +91,5 @@ def contexte_role(request):
         "role_libelle": dict(Profil.ROLES).get(role, ""),
         "est_admin": role == ADMIN,
         "est_employe": role == EMPLOYE,
+        "pointage_telephone": settings.POINTAGE_TELEPHONE,
     }

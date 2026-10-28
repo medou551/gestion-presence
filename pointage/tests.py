@@ -252,7 +252,7 @@ class RolesTests(Base):
         self.assertEqual(self.client.get("/accueil/")["Location"], "/tableau/")
         self.client.logout()
         self.connecter(Profil.EMPLOYE, employe=self.ali)
-        self.assertEqual(self.client.get("/accueil/")["Location"], "/pointer-telephone/")
+        self.assertEqual(self.client.get("/accueil/")["Location"], "/mon-espace/")
 
 
 # =========================================================================== Comptes
@@ -723,6 +723,7 @@ class VisageTests(TestCase):
 
 # =========================================================================== Pointage par téléphone
 
+@override_settings(POINTAGE_TELEPHONE=True)
 class TelephoneTests(Base):
     def setUp(self):
         super().setUp()
@@ -795,6 +796,7 @@ def decale(lat, lon, metres_nord):
     return lat + metres_nord / 111_195, lon
 
 
+@override_settings(POINTAGE_TELEPHONE=True)
 class LieuTests(Base):
     def setUp(self):
         super().setUp()
@@ -854,3 +856,115 @@ class LieuTests(Base):
 
     def test_lieux_reserve_a_l_admin(self):
         self.assertEqual(self.client.get("/lieux/").status_code, 403)
+
+
+# =========================================================================== QR code (tablette)
+
+import secrets  # noqa: E402
+from django.core import signing  # noqa: E402
+from .models import Tablette  # noqa: E402
+from .views_qr import COOKIE_TABLETTE, SEL_QR  # noqa: E402
+
+
+class QrTests(Base):
+    def setUp(self):
+        super().setUp()
+        # L'administrateur installe la tablette (sur la tablette elle-même)
+        self.connecter(Profil.ADMIN)
+        r = self.client.post("/tablettes/activer/", {"nom": "Entrée"})
+        self.assertRedirects(r, "/tablette/", fetch_redirect_response=False)
+        self.jeton = r.cookies[COOKIE_TABLETTE].value
+        self.assertFalse(r.wsgi_request.user.is_authenticated)  # session admin fermée sur la tablette
+        self.tablette = Tablette.objects.get()
+
+    def code(self):
+        """La tablette affiche un QR code ; il contient l'adresse /scan/<code>/ signée par le serveur."""
+        from django.test import Client
+        t = Client()
+        t.cookies[COOKIE_TABLETTE] = self.jeton
+        self.assertEqual(t.get("/tablette/").status_code, 200)
+        self.assertIn("<svg", t.get("/tablette/code/").json()["svg"])
+        return signing.dumps({"t": self.tablette.pk, "n": secrets.token_hex(4)}, salt=SEL_QR, compress=True)
+
+    def employe(self, emp=None):
+        self.client.logout()
+        return self.connecter(Profil.EMPLOYE, employe=emp or self.ali)
+
+    def scanner(self, code, **donnees):
+        self.assertEqual(self.client.get(f"/scan/{code}/").status_code, 200)
+        return self.client.post(f"/scan/{code}/valider/", donnees)
+
+    def test_tablette_sans_jeton_refusee(self):
+        self.client.logout()
+        self.assertEqual(self.client.get("/tablette/").status_code, 403)
+        self.assertEqual(self.client.get("/tablette/code/").status_code, 403)
+
+    def test_entree_puis_sortie_avec_heures_sup(self):
+        self.employe()
+        code = self.code()
+        r = self.scanner(code)
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["type"], "Entrée")
+        self.assertRegex(r.json()["heure"], r"^\d{2}:\d{2}:\d{2}$")
+        p = Pointage.objects.get()
+        self.assertEqual((p.source, p.origine), (Pointage.QR, "QR code (tablette)"))
+        # 9 h 30 plus tard : sortie sans confirmation, 1 h 30 d'heures sup.
+        Pointage.objects.update(horodatage=timezone.now() - timedelta(hours=9, minutes=30))
+        r = self.scanner(self.code())
+        self.assertEqual(r.json()["type"], "Sortie")
+        self.assertIn("1 h 30 min d'heures supplémentaires", r.json()["detail"])
+        self.client.logout(); self.connecter(Profil.ADMIN)
+        if timezone.localtime(Pointage.objects.filter(type="E").get().horodatage).date() == timezone.localdate():
+            self.assertContains(self.client.get("/tableau/"), "+01:30:00")
+
+    def test_sortie_avant_8h_demande_confirmation(self):
+        self.employe()
+        self.scanner(self.code())
+        Pointage.objects.update(horodatage=timezone.now() - timedelta(hours=3))
+        code = self.code()
+        r = self.scanner(code)
+        self.assertTrue(r.json()["confirmer"])
+        self.assertEqual(Pointage.objects.count(), 1)
+        r = self.scanner(code, confirmer="1")
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(Pointage.objects.filter(type="S").count(), 1)
+
+    def test_qr_expire_ou_falsifie_refuse(self):
+        self.employe()
+        faux = signing.dumps({"t": self.tablette.pk}, salt="autre")
+        self.assertEqual(self.client.post(f"/scan/{faux}/valider/").status_code, 403)
+        with override_settings(QR_VALIDITE_SECONDES=-500):
+            self.assertEqual(self.client.post(f"/scan/{self.code()}/valider/").status_code, 403)
+        self.assertFalse(Pointage.objects.exists())
+
+    def test_tablette_desactivee_ses_qr_ne_marchent_plus(self):
+        code = self.code()
+        self.tablette.active = False; self.tablette.save()
+        self.employe()
+        self.assertEqual(self.client.post(f"/scan/{code}/valider/").status_code, 403)
+
+    def test_double_scan_bloque(self):
+        self.employe()
+        code = self.code()
+        self.scanner(code)
+        self.assertEqual(self.scanner(code).status_code, 429)
+
+    def test_admin_ne_peut_pas_scanner(self):
+        self.connecter(Profil.ADMIN)
+        self.assertEqual(self.client.post(f"/scan/{self.code()}/valider/").status_code, 403)
+
+    def test_lieu_applique_au_qr(self):
+        Lieu.objects.create(nom="Beitik Soukouk", latitude=BUREAU[0], longitude=BUREAU[1], rayon_m=20)
+        self.employe()
+        r = self.scanner(self.code(), latitude=BUREAU[0] + 50 / 111195, longitude=BUREAU[1], precision=5)
+        self.assertEqual(r.status_code, 403)
+        r = self.scanner(self.code(), latitude=BUREAU[0] + 10 / 111195, longitude=BUREAU[1], precision=5)
+        self.assertEqual(r.status_code, 200)
+
+    def test_employe_reste_connecte(self):
+        self.client.logout()
+        u = self.compte("ali.tel", Profil.EMPLOYE, employe=self.ali)
+        self.client.post("/connexion/", {"username": "ali.tel", "password": "MotDePasse-Solide-1"})
+        self.assertGreater(self.client.session.get_expiry_age(), 30 * 86400)
+        s = self.client.session; s["derniere_activite"] = int(time.time()) - 5 * 3600; s.save()
+        self.assertEqual(self.client.get("/mon-espace/").status_code, 200)  # pas de déconnexion pour inactivité

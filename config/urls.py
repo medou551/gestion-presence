@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path
 
-from pointage import views, views_auth, views_gestion
+from pointage import views, views_auth, views_gestion, views_qr
 
 urlpatterns = [
     # Accès
@@ -16,7 +16,16 @@ urlpatterns = [
     path("", views.borne, name="borne"),
     path("pointer/", views.pointer, name="pointer"),
 
-    # Pointage depuis le téléphone de l'employé (compte « Employé »)
+    # Pointage par QR code : la tablette l'affiche, l'employé le scanne avec son téléphone
+    path("tablette/", views_qr.tablette, name="tablette"),
+    path("tablette/code/", views_qr.tablette_code, name="tablette_code"),
+    path("tablettes/", views_qr.tablettes, name="tablettes"),
+    path("tablettes/activer/", views_qr.activer_tablette, name="activer_tablette"),
+    path("tablettes/<int:pk>/", views_qr.modifier_tablette, name="modifier_tablette"),
+    path("scan/<str:code>/", views_qr.scan, name="scan"),
+    path("scan/<str:code>/valider/", views_qr.scan_valider, name="scan_valider"),
+
+    # Pointage depuis le téléphone de l'employé avec le visage (désactivé par défaut : POINTAGE_TELEPHONE)
     path("pointer-telephone/", views.pointer_telephone, name="pointer_telephone"),
     path("pointer-telephone/envoyer/", views.pointer_moi, name="pointer_moi"),
 

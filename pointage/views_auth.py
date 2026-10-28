@@ -58,6 +58,9 @@ class Connexion(auth_views.LoginView):
         user = form.get_user()
         effacer_echecs(self.request, user.get_username())
         self.request.session["derniere_activite"] = int(time.time())
+        if role_de(user) == EMPLOYE:
+            # Téléphone personnel : l'employé reste connecté pour scanner le QR code sans retaper son mot de passe
+            self.request.session.set_expiry(settings.SESSION_EMPLOYE_JOURS * 86400)
         journaliser(self.request, "connexion_reussie", utilisateur=user)
         return reponse
 

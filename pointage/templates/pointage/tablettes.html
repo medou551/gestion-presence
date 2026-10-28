@@ -1,0 +1,42 @@
+{% extends "pointage/base.html" %}
+{% block titre %}Tablette QR — AlyGo Présence{% endblock %}
+{% block contenu %}
+<h1>Tablette QR code</h1>
+<p class="aide">La tablette du bureau affiche un QR code qui change toutes les 15 secondes. Chaque employé le scanne
+  avec l'appareil photo de son téléphone (connecté à son compte) : l'heure est enregistrée à la seconde.
+  La tablette n'a besoin d'aucun compte.</p>
+
+<div class="borne">
+  <section class="carte">
+    <h2 style="margin-top:0">Installer la tablette</h2>
+    <ol class="etapes">
+      <li><strong>Sur la tablette</strong>, ouvrez ce site et connectez-vous avec votre compte administrateur.</li>
+      <li>Ouvrez ce menu <em>Tablette QR</em>, donnez un nom puis appuyez sur le bouton ci-dessous.</li>
+      <li>Votre session administrateur est fermée sur la tablette et le QR code s'affiche. Laissez la tablette branchée.</li>
+    </ol>
+    <form method="post" action="{% url 'activer_tablette' %}" class="ligne-form">{% csrf_token %}
+      <input type="text" name="nom" value="Tablette entrée" maxlength="60" required>
+      <button type="submit">Utiliser cet appareil comme tablette</button>
+    </form>
+    <p class="aide">⚠ N'appuyez sur ce bouton que sur la tablette : l'appareil sur lequel vous appuyez devient la tablette.</p>
+  </section>
+
+  <section class="carte">
+    <h2 style="margin-top:0">Tablettes</h2>
+    {% for t in tablettes %}
+      <div style="padding:10px 0;border-bottom:1px solid #eee">
+        <strong>{{ t.nom }}</strong> {% if t.active %}<span class="pastille travail">Active</span>{% else %}<span class="pastille absent">Désactivée</span>{% endif %}
+        <br><small class="aide">Installée le {{ t.creee_le|date:"d/m/Y H:i" }} · dernier signe de vie :
+          {{ t.derniere_activite|date:"d/m/Y H:i:s"|default:"jamais" }}{% if t.adresse_ip %} · {{ t.adresse_ip }}{% endif %}</small>
+        <form method="post" action="{% url 'modifier_tablette' t.id %}" class="ligne-form" style="margin-top:6px">{% csrf_token %}
+          <button type="submit" name="action" value="basculer" class="petit secondaire">{% if t.active %}Désactiver{% else %}Réactiver{% endif %}</button>
+          <button type="submit" name="action" value="supprimer" class="petit danger">Supprimer</button>
+        </form>
+      </div>
+    {% empty %}
+      <p class="vide">Aucune tablette installée.</p>
+    {% endfor %}
+    <p class="aide">Tablette perdue ou volée : supprimez-la, elle n'affichera plus aucun QR code valable.</p>
+  </section>
+</div>
+{% endblock %}

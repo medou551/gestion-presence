@@ -418,6 +418,7 @@ LIBELLES_ACTIONS = {
     "compte_desactive": "Compte désactivé", "role_modifie": "Rôle modifié", "purge_photos": "Purge des photos",
     "sauvegarde": "Sauvegarde", "sauvegarde_echec": "Sauvegarde échouée", "consultation_audit": "Consultation du journal",
     "service_supprime": "Service supprimé", "compte_supprime": "Compte supprimé",
+    "tablette_activee": "Tablette activée", "tablette_modifiee": "Tablette modifiée", "tablette_supprimee": "Tablette supprimée",
     "lieu_cree": "Lieu ajouté", "lieu_modifie": "Lieu modifié", "lieu_supprime": "Lieu supprimé",
     "pointage_manuel_ajoute": "Correction ajoutée", "pointage_manuel_supprime": "Correction supprimée",
 }

@@ -1,0 +1,11 @@
+{% extends "pointage/base.html" %}
+{% block titre %}Tablette — AlyGo Présence{% endblock %}
+{% block contenu %}
+<div class="carte" style="max-width:520px;margin:30px auto;text-align:center">
+  <h1 style="margin-top:0">Tablette non activée</h1>
+  <p>Cet appareil n'est pas (ou plus) enregistré comme tablette de pointage.</p>
+  <p class="aide">L'administrateur doit se connecter sur cet appareil, ouvrir <strong>Tablette QR</strong> et appuyer sur
+    « Utiliser cet appareil comme tablette ».</p>
+  <a class="bouton" href="{% url 'connexion' %}">Se connecter</a>
+</div>
+{% endblock %}

@@ -9,7 +9,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import geo, taches, visage
-from .models import Employe, Lieu, Pointage, Service, resume_journee
+from .models import Employe, Lieu, Pointage, Service, heures_supplementaires, resume_journee
 from .roles import (ADMIN, EMPLOYE, employe_du_compte, employes_visibles, journaliser, pointages_visibles,
                     role_requis)
 
@@ -46,6 +46,14 @@ def _duree(secondes):
     h, reste = divmod(int(secondes), 3600)
     m, s = divmod(reste, 60)
     return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def _secondes(hms):
+    try:
+        h, m, s = map(int, hms.split(":"))
+        return h * 3600 + m * 60 + s
+    except (ValueError, AttributeError):
+        return 0
 
 
 def _lire_date(valeur, defaut):
@@ -264,9 +272,11 @@ def _lignes_du_jour(jour, employes):
             statut = "Au travail"
         else:
             statut = "Parti"
+        sup = heures_supplementaires(secondes) if entree else 0
         lignes.append({
             "employe": emp, "entree": entree, "sortie": sortie,
             "duree": _duree(secondes) if entree else "—",
+            "sup": sup, "sup_txt": _duree(sup) if sup else "—",
             "statut": statut, "retard": bool(entree and entree.en_retard),
         })
     return lignes
@@ -301,6 +311,7 @@ def tableau(request):
         "retards": sum(1 for l in lignes if l["retard"]),
         "total": len(lignes),
         "oublis": sum(1 for l in lignes if l["statut"] == "Sortie manquante"),
+        "heures_sup": _duree(sum(l["sup"] for l in lignes)),
     }
     journaliser(request, "consultation_tableau",
                 f"date={jour:%d/%m/%Y} ; service={service_choisi or 'tous'}")
@@ -311,6 +322,7 @@ def tableau(request):
         "conservation": settings.DUREE_CONSERVATION_PHOTOS_JOURS,
         "peut_corriger": True,
         "heure_actuelle": timezone.localtime().strftime("%H:%M"),
+        "heures_journee": settings.HEURES_JOURNEE,
     })
 
 
@@ -352,7 +364,8 @@ def export_excel(request):
         du = au - timedelta(days=366)
     employes, _, service_choisi = _filtre_service(request)
 
-    resume = [["Date", "Nom", "Service", "Arrivée", "Départ", "Durée (h:min:s)", "Statut", "Retard"]]
+    resume = [["Date", "Nom", "Service", "Arrivée", "Départ", "Durée (h:min:s)", "Heures sup. (h:min:s)", "Statut", "Retard"]]
+    cumul = {}
     jour = du
     while jour <= au:
         for l in _lignes_du_jour(jour, employes):
@@ -360,8 +373,13 @@ def export_excel(request):
                 jour.strftime("%d/%m/%Y"), l["employe"].nom, str(l["employe"].service or ""),
                 f"{timezone.localtime(l['entree'].horodatage):%H:%M:%S}" if l["entree"] else "",
                 f"{timezone.localtime(l['sortie'].horodatage):%H:%M:%S}" if l["sortie"] else "",
-                l["duree"] if l["entree"] else "", l["statut"], "Oui" if l["retard"] else "",
+                l["duree"] if l["entree"] else "", l["sup_txt"] if l["sup"] else "", l["statut"], "Oui" if l["retard"] else "",
             ])
+            if l["entree"]:
+                c = cumul.setdefault(l["employe"].nom, [str(l["employe"].service or ""), 0, 0, 0])
+                c[1] += 1
+                c[2] += _secondes(l["duree"])
+                c[3] += l["sup"]
         jour += timedelta(days=1)
 
     journal = [["Date", "Heure", "Nom", "Service", "Type", "Origine", "Ressemblance (%)", "Adresse IP"]]
@@ -374,7 +392,10 @@ def export_excel(request):
                         p.get_type_display(), p.origine, p.ressemblance if p.ressemblance is not None else "", p.adresse_ip or ""])
 
     journaliser(request, "export_excel", f"du={du:%d/%m/%Y} ; au={au:%d/%m/%Y} ; service={service_choisi or 'tous'}")
-    contenu = _classeur([("Résumé par jour", resume), ("Journal des pointages", journal)])
+    total = [["Nom", "Service", "Jours de présence", "Heures travaillées (h:min:s)", "Heures supplémentaires (h:min:s)"]]
+    for nom, (service, jours, secondes, sup) in sorted(cumul.items()):
+        total.append([nom, service, jours, _duree(secondes), _duree(sup)])
+    contenu = _classeur([("Total par employé", total), ("Résumé par jour", resume), ("Journal des pointages", journal)])
     return _reponse_excel(contenu, f"presence_{du:%Y%m%d}_{au:%Y%m%d}.xlsx")
 
 
@@ -422,7 +443,7 @@ def mon_espace(request):
         return render(request, "pointage/aucun_role.html", {"message": "Ce compte n'est relié à aucun employé."})
     debut, fin = _mois(request)
     jours = []
-    total = 0
+    total = total_sup = 0
     jour = debut
     aujourdhui = timezone.localdate()
     while jour < fin and jour <= aujourdhui:
@@ -431,7 +452,10 @@ def mon_espace(request):
             secondes += (timezone.now() - ouvert).total_seconds()
         if entree:
             total += secondes
+            sup = heures_supplementaires(secondes)
+            total_sup += sup
             jours.append({"jour": jour, "entree": entree, "sortie": sortie, "duree": _duree(secondes),
+                          "sup": _duree(sup) if sup else "",
                           "retard": entree.en_retard, "ouvert": bool(ouvert) and jour == aujourdhui,
                           "manquante": bool(ouvert) and jour < aujourdhui})
         jour += timedelta(days=1)
@@ -443,6 +467,7 @@ def mon_espace(request):
         "precedent": precedent, "suivant": fin if fin <= aujourdhui else None,
         "conservation": settings.DUREE_CONSERVATION_PHOTOS_JOURS,
         "pointage_telephone": settings.POINTAGE_TELEPHONE,
+        "total_sup": _duree(total_sup), "heures_journee": settings.HEURES_JOURNEE,
     })
 
 

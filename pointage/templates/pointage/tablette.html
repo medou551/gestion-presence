@@ -1,0 +1,75 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffd505">
+  <meta name="robots" content="noindex">
+  <title>Pointage — AlyGo</title>
+  <link rel="icon" type="image/png" href="{% static 'pointage/marque/favicon-32.png' %}">
+  <link rel="stylesheet" href="{% static 'pointage/style.css' %}">
+</head>
+<body class="ecran-tablette">
+  <header>
+    <img src="{% static 'pointage/marque/alygo_noir.png' %}" alt="AlyGo">
+    <div class="horloge-tablette"><div class="heure" id="heure">--:--:--</div><div class="date" id="date"></div></div>
+  </header>
+  <main>
+    <div class="qr-zone">
+      <div class="qr" id="qr" aria-label="QR code de pointage"><span class="attente">Chargement…</span></div>
+      <div class="barre-temps"><div id="barre"></div></div>
+    </div>
+    <div class="consignes">
+      <h1>Scannez pour pointer</h1>
+      <ol>
+        <li>Ouvrez l'<strong>appareil photo</strong> de votre téléphone</li>
+        <li>Visez ce QR code</li>
+        <li>Touchez le lien qui apparaît</li>
+      </ol>
+      <p>Arrivée le matin, départ le soir.<br>L'heure est enregistrée à la seconde.</p>
+      <p class="erreur" id="erreur" hidden>Connexion perdue — nouvel essai…</p>
+    </div>
+  </main>
+  <footer>{{ tablette.nom }} · <button type="button" id="plein-ecran" class="petit secondaire">Plein écran</button></footer>
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const el = id => document.getElementById(id);
+  const fuseau = "{{ fuseau }}", RENOUV = {{ renouvellement }} * 1000;
+  let decalage = {{ serveur_ms }} - Date.now(), prochain = 0;
+  const fmtH = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: fuseau });
+  const fmtD = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: fuseau });
+  function tic() {
+    const d = new Date(Date.now() + decalage);
+    el("heure").textContent = fmtH.format(d); el("date").textContent = fmtD.format(d);
+    const reste = Math.max(0, prochain - Date.now());
+    el("barre").style.width = (100 * reste / RENOUV) + "%";
+  }
+  async function nouveauCode() {
+    try {
+      const r = await fetch("{% url 'tablette_code' %}", { cache: "no-store", credentials: "same-origin" });
+      if (r.status === 403) { location.reload(); return; }
+      const d = await r.json();
+      el("qr").innerHTML = d.svg;
+      decalage = d.serveur_ms - Date.now();
+      el("erreur").hidden = true;
+      prochain = Date.now() + RENOUV;
+      setTimeout(nouveauCode, RENOUV);
+    } catch (e) {
+      el("erreur").hidden = false;
+      el("qr").classList.add("perdu");
+      setTimeout(nouveauCode, 5000);
+      return;
+    }
+    el("qr").classList.remove("perdu");
+  }
+  // L'écran de la tablette reste allumé
+  async function resterAllume() { try { if (navigator.wakeLock) await navigator.wakeLock.request("screen"); } catch (e) {} }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) { resterAllume(); nouveauCode(); } });
+  el("plein-ecran").addEventListener("click", () => { const d = document.documentElement; (d.requestFullscreen || d.webkitRequestFullscreen || (() => {})).call(d); });
+  resterAllume(); nouveauCode(); tic(); setInterval(tic, 250);
+  // Rechargement complet chaque nuit (mises à jour de l'application)
+  setTimeout(() => location.reload(), 12 * 3600 * 1000);
+})();
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@ from django.contrib.auth import logout
 from django.shortcuts import redirect
 from django.urls import reverse
 
-from .roles import journaliser, role_de
+from .roles import EMPLOYE, journaliser, role_de
 
 
 class IPClientMiddleware:
@@ -76,7 +76,8 @@ class SessionMiddleware:
             role = role_de(user)
             maintenant = int(time.time())
             derniere = request.session.get("derniere_activite", maintenant)
-            if maintenant - derniere > settings.SESSION_INACTIVITE_MINUTES * 60:
+            # Les employés restent connectés sur leur téléphone ; l'administrateur est déconnecté après inactivité
+            if role != EMPLOYE and maintenant - derniere > settings.SESSION_INACTIVITE_MINUTES * 60:
                 journaliser(request, "deconnexion_inactivite")
                 logout(request)
                 return redirect(f"{settings.LOGIN_URL}?expire=1")

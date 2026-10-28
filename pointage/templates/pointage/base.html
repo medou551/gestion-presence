@@ -21,11 +21,12 @@
           <a href="{% url 'employes' %}">Employés</a>
           <a href="{% url 'borne' %}">Poste de pointage</a>
           <a href="{% url 'comptes' %}">Comptes</a>
+          <a href="{% url 'tablettes' %}">Tablette QR</a>
           <a href="{% url 'lieux' %}">Lieux</a>
           <a href="{% url 'audit' %}">Journal</a>
         {% endif %}
         {% if est_employe %}
-          <a href="{% url 'pointer_telephone' %}">Pointer</a>
+          {% if pointage_telephone %}<a href="{% url 'pointer_telephone' %}">Pointer</a>{% endif %}
           <a href="{% url 'mon_espace' %}">Mon espace</a>
         {% endif %}
         <span class="qui" title="{{ role_libelle }}">{{ user.get_username }}{% if role_libelle %} · {{ role_libelle }}{% endif %}</span>
