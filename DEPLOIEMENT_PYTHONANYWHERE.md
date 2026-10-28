@@ -14,9 +14,12 @@ sur les téléphones des employés, sans installer de certificat.
   compatible avec la loi n° 2017-020 et informez-en les employés.
 - **L'application est accessible depuis Internet** : utilisez des mots de passe solides, peu de comptes administrateurs,
   et surveillez le **Journal** (tentatives de connexion échouées).
-- **Compte gratuit** : suffisant pour tester et pour une petite équipe, avec des limites :
-  1 application, environ 512 Mo de disque, temps de calcul limité, une seule tâche planifiée,
-  et il faut cliquer « Run until 3 months from today » dans l'onglet *Web* tous les 3 mois.
+- **Compte gratuit** : suffisant pour **tester**, avec des limites (depuis janvier 2026) :
+  1 application, environ 512 Mo de disque, temps de calcul limité, **pas de tâche planifiée** (donc pas de
+  sauvegarde automatique : lancez `python manage.py sauvegarder` à la main), pas d'assistance directe,
+  et il faut cliquer « Run until 1 month from today » dans l'onglet *Web* **chaque mois**, sinon le site s'arrête.
+- **Formule Developer (10 $ ou 10 €/mois)** : conseillée pour l'utilisation réelle. Le site ne s'arrête plus,
+  5 Go de disque, sauvegarde quotidienne automatique (étape 5), assistance par e-mail.
   Les photos font environ 50 à 100 Ko et sont supprimées après 30 jours : comptez ~100 Mo pour 50 employés.
 - La reconnaissance du visage tourne **dans le navigateur du téléphone**, pas sur le serveur : un compte gratuit suffit.
 
@@ -119,4 +122,4 @@ En cas d'erreur sur le site, regardez le **Error log** (lien dans l'onglet **Web
 | Page sans mise en forme | Vérifiez la ligne **Static files** (`/static/` → `.../staticfiles`) puis **Reload** |
 | « Impossible de déchiffrer » | Le fichier `.env` a été remplacé : remettez celui d'origine |
 | Tout le monde bloqué après des erreurs de mot de passe | Vérifiez `EN_TETE_IP_CLIENT=HTTP_X_REAL_IP` dans `.env` |
-| Site arrêté après 3 mois (compte gratuit) | Onglet **Web** → *Run until 3 months from today* |
+| Site arrêté (compte gratuit, chaque mois) | Onglet **Web** → *Run until 1 month from today*, ou passez en formule Developer |
