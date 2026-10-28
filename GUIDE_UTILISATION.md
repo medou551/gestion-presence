@@ -80,11 +80,15 @@ Une tablette au bureau affiche un **QR code qui change toutes les 15 secondes**.
 l'appareil photo de son téléphone : le serveur enregistre l'heure **à la seconde**.
 Premier scan du jour = **entrée**, scan suivant = **sortie**.
 
-**Installer la tablette (une fois, administrateur)**
+**Afficher le QR code depuis l'administration (le plus simple)** : connecté en administrateur, menu **QR code**
+(ou bouton « Afficher le QR code de pointage » sur le tableau de bord) → **Plein écran**. Les employés scannent l'écran.
+Ne laissez pas cet appareil sans surveillance : il est connecté en administrateur.
+
+**Ou : tablette dédiée sans compte (conseillé pour une tablette posée à l'entrée)**
 1. Sur la tablette, ouvrez `https://alygo.pythonanywhere.com/connexion/` et connectez-vous en administrateur.
-2. Menu **Tablette QR** → donnez un nom (ex. « Tablette entrée ») → **Utiliser cet appareil comme tablette**.
+2. Bouton **Tablette dédiée (sans compte)** du tableau de bord → donnez un nom (ex. « Tablette entrée ») → **Utiliser cet appareil comme tablette**.
 3. La session administrateur se ferme et le QR code s'affiche. Touchez **Plein écran**, laissez la tablette branchée.
-   (Tablette perdue : menu **Tablette QR** → **Supprimer**, ses QR codes ne marchent plus.)
+   (Tablette perdue : **Tablette dédiée** → **Supprimer**, ses QR codes ne marchent plus.)
 
 **Pour chaque employé (une fois)** : créez son accès (Employés → Modifier → **Créer son accès**). Au premier scan,
 il se connecte avec son identifiant ; ensuite il **reste connecté** sur son téléphone (60 jours).
