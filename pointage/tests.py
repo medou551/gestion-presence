@@ -252,7 +252,7 @@ class RolesTests(Base):
         self.assertEqual(self.client.get("/accueil/")["Location"], "/tableau/")
         self.client.logout()
         self.connecter(Profil.EMPLOYE, employe=self.ali)
-        self.assertEqual(self.client.get("/accueil/")["Location"], "/mon-espace/")
+        self.assertEqual(self.client.get("/accueil/")["Location"], "/scanner/")
 
 
 # =========================================================================== Comptes
@@ -769,7 +769,7 @@ class TelephoneTests(Base):
     @override_settings(POINTAGE_TELEPHONE=False)
     def test_desactivable(self):
         self.assertEqual(self.envoyer(variante(ALI)).status_code, 403)
-        self.assertRedirects(self.client.get("/accueil/"), "/mon-espace/")
+        self.assertRedirects(self.client.get("/accueil/"), "/scanner/")
 
     def test_admin_cree_l_acces_depuis_la_fiche(self):
         self.client.logout()
@@ -988,3 +988,14 @@ class QrAdminTests(Base):
         # Un faux « administrateur » (employé) ne peut pas fabriquer de QR
         faux = signing.dumps({"a": self.client.session["_auth_user_id"]}, salt="autre")
         self.assertEqual(self.client.post(f"/scan/{faux}/valider/").status_code, 403)
+
+
+class ScannerTests(Base):
+    def test_lecteur_integre(self):
+        self.connecter(Profil.EMPLOYE, employe=self.ali)
+        r = self.client.get("/scanner/")
+        self.assertContains(r, "jsQR.js")
+        self.assertContains(r, "Prochain : <strong>entrée</strong>", html=False)
+        self.client.logout()
+        self.connecter(Profil.ADMIN)
+        self.assertEqual(self.client.get("/scanner/").status_code, 403)

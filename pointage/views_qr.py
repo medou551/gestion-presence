@@ -136,6 +136,18 @@ def _lire_code(code, marge=0):
 # ---------------------------------------------------------------- Scan par l'employé
 
 @role_requis(EMPLOYE)
+def scanner(request):
+    """Lecteur de QR code intégré à l'application (caméra arrière du téléphone)."""
+    emp = employe_du_compte(request.user)
+    dernier = emp.dernier_pointage() if emp else None
+    aujourdhui = timezone.localdate()
+    prochain = "sortie" if (dernier and timezone.localtime(dernier.horodatage).date() == aujourdhui
+                            and dernier.type == Pointage.ENTREE) else "entrée"
+    return render(request, "pointage/scanner.html", {"employe": emp, "prochain": prochain,
+                  "dernier": dernier if dernier and timezone.localtime(dernier.horodatage).date() == aujourdhui else None})
+
+
+@role_requis(EMPLOYE)
 def scan(request, code):
     """Page ouverte par le téléphone après avoir scanné le QR code. Elle enregistre le pointage toute seule."""
     from .models import Lieu

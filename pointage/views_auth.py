@@ -105,7 +105,8 @@ def accueil(request):
     role = role_de(request.user)
     if role == EMPLOYE:
         # Sur téléphone, l'employé arrive directement sur la page de pointage
-        return redirect(reverse("pointer_telephone" if settings.POINTAGE_TELEPHONE else "mon_espace"))
+        # L'employé arrive directement sur le lecteur de QR code (ou le pointage par visage si activé)
+        return redirect(reverse("pointer_telephone" if settings.POINTAGE_TELEPHONE else "scanner"))
     if role == ADMIN:
         return redirect(reverse("tableau"))
     return redirect(reverse("aucun_role"))

@@ -26,7 +26,7 @@
           <a href="{% url 'audit' %}">Journal</a>
         {% endif %}
         {% if est_employe %}
-          {% if pointage_telephone %}<a href="{% url 'pointer_telephone' %}">Pointer</a>{% endif %}
+          {% if pointage_telephone %}<a href="{% url 'pointer_telephone' %}">Pointer</a>{% else %}<a href="{% url 'scanner' %}">Scanner</a>{% endif %}
           <a href="{% url 'mon_espace' %}">Mon espace</a>
         {% endif %}
         <span class="qui" title="{{ role_libelle }}">{{ user.get_username }}{% if role_libelle %} · {{ role_libelle }}{% endif %}</span>

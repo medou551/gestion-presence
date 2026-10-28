@@ -1,0 +1,96 @@
+{% extends "pointage/base.html" %}
+{% load static %}
+{% block titre %}Scanner — AlyGo Présence{% endblock %}
+{% block contenu %}
+<div class="telephone-pointage">
+  <section class="carte">
+    <h1 style="margin:0 0 4px;font-size:20px">{{ employe.nom|default:"" }}</h1>
+    <p class="aide" style="margin:0">{% if dernier %}Dernier pointage aujourd'hui : {{ dernier.get_type_display }} à {{ dernier.horodatage|time:"H:i:s" }} · {% endif %}Prochain : <strong>{{ prochain }}</strong></p>
+    <div class="camera lecteur" style="margin-top:12px">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="viseur" aria-hidden="true"></div>
+      <div class="consigne" id="consigne">Ouverture de la caméra…</div>
+      <div class="aucune" id="pas-camera" hidden><div><strong>Caméra indisponible</strong><p id="pas-camera-detail"></p>
+        <button type="button" id="reessayer" class="petit">Réessayer</button></div></div>
+    </div>
+    <p class="aide" style="text-align:center">Visez le QR code affiché au bureau : il est lu tout seul.</p>
+  </section>
+  <p style="text-align:center"><a href="{% url 'mon_espace' %}">Voir mes heures →</a></p>
+</div>
+<script src="{% static 'pointage/jsQR.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const el = id => document.getElementById(id);
+  const video = el("video"), consigne = el("consigne");
+  const canvas = document.createElement("canvas"), ctx = canvas.getContext("2d", { willReadFrequently: true });
+  let fini = false, detecteur = null;
+  try { if ("BarcodeDetector" in window) detecteur = new BarcodeDetector({ formats: ["qr_code"] }); } catch (e) { detecteur = null; }
+
+  function adresseValide(texte) {
+    try {
+      const u = new URL(texte, location.href);
+      return u.host === location.host && /^\/scan\/[^/]+\/$/.test(u.pathname) ? u.pathname : null;
+    } catch (e) { return null; }
+  }
+
+  async function lire() {
+    if (fini) return;
+    if (video.readyState >= 2 && video.videoWidth) {
+      let texte = null;
+      try {
+        if (detecteur) {
+          const codes = await detecteur.detect(video);
+          if (codes.length) texte = codes[0].rawValue;
+        } else {
+          const l = Math.min(640, video.videoWidth), h = Math.round(l * video.videoHeight / video.videoWidth);
+          canvas.width = l; canvas.height = h; ctx.drawImage(video, 0, 0, l, h);
+          const r = jsQR(ctx.getImageData(0, 0, l, h).data, l, h, { inversionAttempts: "dontInvert" });
+          if (r) texte = r.data;
+        }
+      } catch (e) { /* image suivante */ }
+      if (texte) {
+        const chemin = adresseValide(texte);
+        if (chemin) {
+          fini = true;
+          consigne.textContent = "✔ QR code lu — enregistrement…";
+          if (navigator.vibrate) navigator.vibrate(80);
+          if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+          location.href = chemin;
+          return;
+        }
+        consigne.textContent = "Ce n'est pas le QR code de pointage AlyGo.";
+      } else {
+        consigne.textContent = "Visez le QR code affiché au bureau";
+      }
+    }
+    setTimeout(lire, 150);
+  }
+
+  async function demarrer() {
+    el("pas-camera").hidden = true;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      el("pas-camera-detail").textContent = window.isSecureContext ? "Ce navigateur ne permet pas d'utiliser la caméra." : "La caméra exige une adresse en https://.";
+      el("pas-camera").hidden = false; return;
+    }
+    const essais = [{ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } }, audio: false }, { video: true, audio: false }];
+    for (const c of essais) {
+      try {
+        video.srcObject = await navigator.mediaDevices.getUserMedia(c);
+        video.setAttribute("playsinline", ""); await video.play().catch(() => {});
+        consigne.textContent = "Visez le QR code affiché au bureau";
+        lire(); return;
+      } catch (e) {
+        if (e && e.name === "NotAllowedError") {
+          el("pas-camera-detail").textContent = "Caméra refusée : autorisez la caméra pour ce site (icône à gauche de l'adresse), puis réessayez. Vous pouvez aussi scanner avec l'appareil photo du téléphone.";
+          el("pas-camera").hidden = false; return;
+        }
+      }
+    }
+    el("pas-camera-detail").textContent = "Impossible d'ouvrir la caméra. Utilisez l'appareil photo du téléphone pour scanner le QR code.";
+    el("pas-camera").hidden = false;
+  }
+  el("reessayer").addEventListener("click", demarrer);
+  demarrer();
+})();
+</script>
+{% endblock %}

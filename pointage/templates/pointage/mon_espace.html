@@ -13,9 +13,10 @@
 {% if pointage_telephone %}
 <p><a class="bouton" href="{% url 'pointer_telephone' %}">📷 Pointer avec mon téléphone</a></p>
 {% else %}
+<p><a class="bouton gros-lien" href="{% url 'scanner' %}">▦ Scanner le QR code</a></p>
 <div class="carte aide-qr">
-  <strong>Pour pointer :</strong> ouvrez l'appareil photo de votre téléphone et visez le QR code affiché sur la tablette
-  du bureau, puis touchez le lien qui apparaît. L'heure est enregistrée à la seconde.
+  <strong>Pour pointer :</strong> touchez « Scanner le QR code » et visez le QR code affiché au bureau
+  (ou utilisez l'appareil photo du téléphone). L'heure est enregistrée à la seconde.
   Arrivée le matin, départ le soir ; au-delà de {{ heures_journee|floatformat:"-1" }} h de travail, ce sont des heures supplémentaires.
 </div>
 {% endif %}
