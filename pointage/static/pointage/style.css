@@ -192,3 +192,18 @@ header.barre .qui { background: var(--noir); color: var(--jaune); border-color: 
 .page-connexion .logo-fond { display: inline-block; background: var(--jaune); border: 3px solid var(--noir); border-radius: 18px; padding: 18px 28px; }
 .page-connexion img { height: 64px; width: auto; display: block; }
 .page-connexion p { margin: 10px 0 0; color: var(--doux); font-weight: 600; }
+
+/* ---------- Pointage guidé (téléphone) ---------- */
+.cadre-visage { transition: border-color .2s, box-shadow .2s; }
+.cadre-visage.presque { border: 4px solid var(--jaune); }
+.cadre-visage.bon { border: 5px solid #2ecc71; box-shadow: 0 0 0 4px rgba(46,204,113,.35); }
+.consigne { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px; text-align: center;
+  background: rgba(0,0,0,.72); color: var(--jaune); font-weight: 800; font-size: 17px; }
+.telephone-pointage #commencer { margin-top: 14px; }
+.resultat { text-align: center; padding: 22px 10px 6px; }
+.resultat .icone { width: 84px; height: 84px; margin: 0 auto 12px; border-radius: 50%; font-size: 48px; line-height: 84px; font-weight: 800; }
+.resultat.ok .icone { background: var(--vert-clair); color: var(--vert); }
+.resultat.erreur .icone { background: var(--rouge-clair); color: var(--rouge); }
+.resultat .texte { font-size: 19px; font-weight: 700; margin-bottom: 14px; }
+.resultat.ok .texte { color: var(--vert); }
+.resultat.erreur .texte { color: var(--rouge); }
