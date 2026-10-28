@@ -1,6 +1,6 @@
 {% extends "pointage/base.html" %}
 {% load static %}
-{% block titre %}Pointer — Gestion de présence{% endblock %}
+{% block titre %}Pointer — AlyGo Présence{% endblock %}
 {% block contenu %}
 <div class="telephone-pointage">
   <div class="horloge">
@@ -18,7 +18,7 @@
     {% if probleme %}
       <p class="alerte">{{ probleme }}</p>
     {% elif not employe.a_reference %}
-      <p class="alerte">Vous n'avez pas encore de photo de référence. Demandez aux RH de l'enregistrer.</p>
+      <p class="alerte">Vous n'avez pas encore de photo de référence. Demandez à l'administrateur de l'enregistrer.</p>
     {% else %}
     <div class="camera" style="margin-top:12px">
       <video id="video" autoplay playsinline muted></video>

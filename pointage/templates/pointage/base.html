@@ -4,25 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="same-origin">
-  <title>{% block titre %}Gestion de présence{% endblock %}</title>
+  <title>{% block titre %}AlyGo Présence{% endblock %}</title>
+  <meta name="theme-color" content="#ffd505">
+  <link rel="icon" type="image/png" href="{% static 'pointage/marque/favicon-32.png' %}">
+  <link rel="apple-touch-icon" href="{% static 'pointage/marque/icone-180.png' %}">
+  <link rel="manifest" href="{% static 'pointage/marque/manifest.json' %}">
   <link rel="stylesheet" href="{% static 'pointage/style.css' %}">
 </head>
 <body>
   <header class="barre">
-    <span class="titre">Gestion de présence</span>
+    <a class="titre" href="{% url 'accueil' %}"><img src="{% static 'pointage/marque/alygo_noir.png' %}" alt="AlyGo"><span>Présence</span></a>
     <nav>
       {% if user.is_authenticated %}
-        {% if est_borne %}
-          <a href="{% url 'borne' %}">Pointage</a>
-        {% endif %}
-        {% if est_gestion %}
-          <a href="{% url 'tableau' %}">Tableau de bord</a>
-        {% endif %}
-        {% if peut_gerer_employes %}
-          <a href="{% url 'employes' %}">Employés</a>
-        {% endif %}
         {% if est_admin %}
-          <a href="{% url 'borne' %}">Borne</a>
+          <a href="{% url 'tableau' %}">Tableau de bord</a>
+          <a href="{% url 'employes' %}">Employés</a>
+          <a href="{% url 'borne' %}">Poste de pointage</a>
           <a href="{% url 'comptes' %}">Comptes</a>
           <a href="{% url 'lieux' %}">Lieux</a>
           <a href="{% url 'audit' %}">Journal</a>
@@ -32,7 +29,7 @@
           <a href="{% url 'mon_espace' %}">Mon espace</a>
         {% endif %}
         <span class="qui" title="{{ role_libelle }}">{{ user.get_username }}{% if role_libelle %} · {{ role_libelle }}{% endif %}</span>
-        {% if not est_borne %}<a href="{% url 'changer_mdp' %}">Mot de passe</a>{% endif %}
+        <a href="{% url 'changer_mdp' %}">Mot de passe</a>
         <form method="post" action="{% url 'deconnexion' %}" class="form-deconnexion">{% csrf_token %}
           <button type="submit" class="lien-bouton">Déconnexion</button>
         </form>

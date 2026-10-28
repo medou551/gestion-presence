@@ -101,7 +101,7 @@ class Base(Donnees, TestCase):
 class PointageTests(Base):
     def setUp(self):
         super().setUp()
-        self.connecter(Profil.BORNE)
+        self.connecter(Profil.ADMIN)  # poste de pointage commun, ouvert par l'administrateur
 
     def test_bon_visage_accepte(self):
         r = self.pointer(self.ali, variante(ALI))
@@ -174,60 +174,50 @@ class RolesTests(Base):
             self.assertIn("/connexion/", r["Location"])
         self.assertEqual(self.client.post("/pointer/", {}).status_code, 302)
 
-    def test_seule_la_borne_peut_pointer(self):
-        for role in (Profil.RH, Profil.CHEF, Profil.EMPLOYE):
-            self.client.logout()
-            kw = {"service": self.compta} if role == Profil.CHEF else {"employe": self.ali} if role == Profil.EMPLOYE else {}
-            if role == Profil.EMPLOYE:
-                Profil.objects.filter(employe=self.ali).delete()
-            self.connecter(role, **kw)
-            self.assertEqual(self.pointer(self.ali, variante(ALI)).status_code, 403, role)
-            self.assertEqual(self.client.get("/").status_code, 403, role)
+    def test_seul_l_admin_ouvre_le_poste_de_pointage(self):
+        self.connecter(Profil.EMPLOYE, employe=self.ali)
+        self.assertEqual(self.pointer(self.ali, variante(ALI)).status_code, 403)
+        self.assertEqual(self.client.get("/").status_code, 403)
 
     def test_matrice_des_acces(self):
         attendu = {
-            Profil.BORNE:   {"/tableau/": 403, "/employes/": 403, "/comptes/": 403, "/audit/": 403, "/mon-espace/": 403},
-            Profil.EMPLOYE: {"/tableau/": 403, "/employes/": 403, "/comptes/": 403, "/audit/": 403, "/mon-espace/": 200},
-            Profil.CHEF:    {"/tableau/": 200, "/employes/": 403, "/comptes/": 403, "/audit/": 403, "/mon-espace/": 403},
-            Profil.RH:      {"/tableau/": 200, "/employes/": 200, "/comptes/": 403, "/audit/": 403, "/mon-espace/": 403},
-            Profil.ADMIN:   {"/tableau/": 200, "/employes/": 200, "/comptes/": 200, "/audit/": 200, "/mon-espace/": 403},
+            Profil.EMPLOYE: {"/tableau/": 403, "/employes/": 403, "/comptes/": 403, "/audit/": 403, "/lieux/": 403,
+                             "/export/": 403, "/": 403, "/mon-espace/": 200, "/pointer-telephone/": 200},
+            Profil.ADMIN:   {"/tableau/": 200, "/employes/": 200, "/comptes/": 200, "/audit/": 200, "/lieux/": 200,
+                             "/": 200, "/mon-espace/": 403, "/pointer-telephone/": 403},
         }
         for role, pages in attendu.items():
             self.client.logout()
-            kw = {"service": self.compta} if role == Profil.CHEF else {"employe": self.oumar} if role == Profil.EMPLOYE else {}
+            kw = {"employe": self.oumar} if role == Profil.EMPLOYE else {}
             self.connecter(role, **kw)
             for url, code in pages.items():
                 self.assertEqual(self.client.get(url).status_code, code, f"{role} {url}")
 
+    def test_seulement_deux_roles(self):
+        self.assertEqual([c for c, _ in Profil.ROLES], ["admin", "employe"])
+        self.connecter(Profil.ADMIN)
+        for ancien in ("rh", "chef", "borne"):
+            self.client.post("/comptes/", {"identifiant": f"x.{ancien}", "role": ancien, "service": self.compta.id})
+            self.assertFalse(User.objects.filter(username=f"x.{ancien}").exists(), ancien)
+
+    def test_ancien_role_n_a_plus_aucun_acces(self):
+        for ancien in ("rh", "chef", "borne"):
+            self.client.logout()
+            u = User.objects.create_user(f"ancien.{ancien}", password="MotDePasse-Solide-1")
+            Profil.objects.create(utilisateur=u, role=ancien, service=self.compta, doit_changer_mdp=False)
+            self.client.force_login(u)
+            for url in ("/", "/tableau/", "/employes/", "/mon-espace/", "/pointer-telephone/"):
+                self.assertEqual(self.client.get(url).status_code, 403, f"{ancien} {url}")
+
     def test_admin_django_reserve_a_l_administrateur(self):
-        self.connecter(Profil.RH)
+        self.connecter(Profil.EMPLOYE, employe=self.ali)
         self.assertNotEqual(self.client.get("/admin/").status_code, 200)
         self.client.logout()
         self.connecter(Profil.ADMIN)
         self.assertEqual(self.client.get("/admin/").status_code, 200)
 
-    def test_chef_ne_voit_que_son_service(self):
-        self.connecter(Profil.CHEF, service=self.accueil)
-        p_ali = Pointage.objects.create(employe=self.ali, type="E")
-        p_ali.photo.save("x.jpg", ContentFile(JPEG + b"ali"))
-        p_fatou = Pointage.objects.create(employe=self.fatou, type="E")
-        p_fatou.photo.save("y.jpg", ContentFile(JPEG + b"fatou"))
-
-        r = self.client.get("/tableau/")
-        self.assertContains(r, "Fatou Ba")
-        self.assertNotContains(r, "Ali Ould Ahmed")
-        self.assertNotContains(r, "Oumar Diallo")
-        self.assertEqual(self.client.get(f"/photos/pointage/{p_fatou.id}/").status_code, 200)
-        self.assertEqual(self.client.get(f"/photos/pointage/{p_ali.id}/").status_code, 404)
-        self.assertEqual(self.client.get(f"/photos/reference/{self.ali.id}/").status_code, 404)
-        # Le chef ne peut pas forcer un autre service par l'URL
-        r = self.client.get(f"/tableau/?service={self.compta.id}")
-        self.assertNotContains(r, "Ali Ould Ahmed")
-        export = self.client.get("/export/")
-        self.assertEqual(export.status_code, 200)
-
-    def test_rh_voit_tout_et_peut_filtrer(self):
-        self.connecter(Profil.RH)
+    def test_admin_voit_tout_et_peut_filtrer(self):
+        self.connecter(Profil.ADMIN)
         r = self.client.get("/tableau/")
         for nom in ("Ali Ould Ahmed", "Fatou Ba", "Oumar Diallo"):
             self.assertContains(r, nom)
@@ -258,26 +248,31 @@ class RolesTests(Base):
         self.assertEqual(self.client.get("/tableau/").status_code, 403)
 
     def test_redirection_selon_le_role(self):
-        for role, cible in ((Profil.BORNE, "/"), (Profil.RH, "/tableau/")):
-            self.client.logout()
-            self.connecter(role)
-            self.assertEqual(self.client.get("/accueil/")["Location"], cible)
+        self.connecter(Profil.ADMIN)
+        self.assertEqual(self.client.get("/accueil/")["Location"], "/tableau/")
+        self.client.logout()
+        self.connecter(Profil.EMPLOYE, employe=self.ali)
+        self.assertEqual(self.client.get("/accueil/")["Location"], "/pointer-telephone/")
 
 
 # =========================================================================== Comptes
 
 class ComptesTests(Base):
-    def test_admin_cree_un_chef_avec_service(self):
+    def test_admin_cree_un_utilisateur(self):
         self.connecter(Profil.ADMIN)
-        r = self.client.post("/comptes/", {"identifiant": "chef.compta", "role": "chef"})
-        self.assertFalse(User.objects.filter(username="chef.compta").exists())
-        r = self.client.post("/comptes/", {"identifiant": "chef.compta", "role": "chef", "service": self.compta.id})
-        u = User.objects.get(username="chef.compta")
-        self.assertEqual(u.profil.service, self.compta)
+        self.client.post("/comptes/", {"identifiant": "ali", "role": "employe"})
+        self.assertFalse(User.objects.filter(username="ali").exists())  # doit être relié à un employé
+        r = self.client.post("/comptes/", {"identifiant": "ali", "role": "employe", "employe": self.ali.id})
+        u = User.objects.get(username="ali")
+        self.assertEqual(u.profil.employe, self.ali)
         self.assertTrue(u.profil.doit_changer_mdp)
         self.assertFalse(u.is_staff)
-        mdp = r.context["mdp_affiche"][1]
-        self.assertTrue(u.check_password(mdp))
+        self.assertTrue(u.check_password(r.context["mdp_affiche"][1]))
+
+    def test_admin_cree_un_administrateur(self):
+        self.connecter(Profil.ADMIN)
+        self.client.post("/comptes/", {"identifiant": "admin2", "role": "admin"})
+        self.assertTrue(User.objects.get(username="admin2").is_superuser)
 
     def test_compte_employe_unique(self):
         self.connecter(Profil.ADMIN)
@@ -287,18 +282,18 @@ class ComptesTests(Base):
         self.assertFalse(User.objects.filter(username="ali2").exists())
 
     def test_changement_de_mot_de_passe_obligatoire(self):
-        u = self.compte("nouveau", Profil.RH, changer=True)
+        u = self.compte("nouveau", Profil.EMPLOYE, employe=self.ali, changer=True)
         self.client.force_login(u)
-        r = self.client.get("/tableau/")
+        r = self.client.get("/mon-espace/")
         self.assertEqual(r["Location"], "/mot-de-passe/")
         self.client.post("/mot-de-passe/", {"old_password": "MotDePasse-Solide-1",
                                             "new_password1": "Nouveau-Secret-2026", "new_password2": "Nouveau-Secret-2026"})
         u.profil.refresh_from_db()
         self.assertFalse(u.profil.doit_changer_mdp)
-        self.assertEqual(self.client.get("/tableau/").status_code, 200)
+        self.assertEqual(self.client.get("/mon-espace/").status_code, 200)
 
     def test_mot_de_passe_trop_faible_refuse(self):
-        u = self.compte("faible", Profil.RH, changer=True)
+        u = self.compte("faible", Profil.EMPLOYE, employe=self.ali, changer=True)
         self.client.force_login(u)
         self.client.post("/mot-de-passe/", {"old_password": "MotDePasse-Solide-1",
                                             "new_password1": "12345678", "new_password2": "12345678"})
@@ -307,7 +302,7 @@ class ComptesTests(Base):
 
     def test_desactiver_et_reinitialiser(self):
         admin = self.connecter(Profil.ADMIN)
-        rh = self.compte("rh1", Profil.RH)
+        rh = self.compte("rh1", Profil.EMPLOYE, employe=self.ali)
         self.client.post(f"/comptes/{rh.id}/", {"action": "desactiver"})
         rh.refresh_from_db()
         self.assertFalse(rh.is_active)
@@ -326,7 +321,7 @@ class ComptesTests(Base):
 class ConnexionTests(Base):
     def setUp(self):
         super().setUp()
-        self.u = self.compte("chef", Profil.CHEF, service=self.compta)
+        self.u = self.compte("chef", Profil.ADMIN)
 
     def test_connexion_reussie_journalisee(self):
         r = self.client.post("/connexion/", {"username": "chef", "password": "MotDePasse-Solide-1"})
@@ -352,14 +347,6 @@ class ConnexionTests(Base):
         self.assertEqual(r.status_code, 302)
         self.assertIn("expire=1", r["Location"])
         self.assertTrue(JournalAudit.objects.filter(action="deconnexion_inactivite").exists())
-
-    def test_borne_pas_deconnectee_par_inactivite(self):
-        b = self.compte("borne1", Profil.BORNE, changer=True)
-        self.client.force_login(b)
-        s = self.client.session
-        s["derniere_activite"] = int(time.time()) - 5 * 3600
-        s.save()
-        self.assertEqual(self.client.get("/").status_code, 200)
 
     def test_en_tetes_de_securite(self):
         self.client.force_login(self.u)
@@ -414,11 +401,11 @@ class ConfidentialiteTests(Base):
         self.assertTrue(recent.photo)
         self.assertTrue(Pointage.objects.filter(pk=ancien.pk).exists())  # l'heure reste
 
-    def test_effacement_biometrie_par_rh(self):
+    def test_effacement_biometrie(self):
         p = Pointage.objects.create(employe=self.ali, type="E")
         p.photo.save("x.jpg", ContentFile(JPEG + b"x"))
         fichiers = [Path(MEDIA_TEST, self.ali.photo_reference.name), Path(MEDIA_TEST, p.photo.name)]
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
         self.client.post(f"/employes/{self.ali.id}/effacer-biometrie/")
         self.ali.refresh_from_db()
         self.assertFalse(self.ali.a_reference)
@@ -427,7 +414,7 @@ class ConfidentialiteTests(Base):
         self.assertEqual(Pointage.objects.filter(employe=self.ali).count(), 1)
 
     def test_suppression_complete_reservee_admin_avec_confirmation(self):
-        self.connecter(Profil.RH)
+        self.connecter(Profil.EMPLOYE, employe=self.oumar)
         self.assertEqual(self.client.post(f"/employes/{self.ali.id}/supprimer/", {"confirmation": "Ali Ould Ahmed"}).status_code, 403)
         self.client.logout()
         self.connecter(Profil.ADMIN)
@@ -490,8 +477,8 @@ class AuditTests(Base):
             entree.delete()
 
     def test_consultations_et_exports_journalises(self):
-        self.connecter(Profil.CHEF, service=self.compta)
-        self.client.get("/tableau/")
+        self.connecter(Profil.ADMIN)
+        self.client.get(f"/tableau/?service={self.compta.id}")
         self.client.get("/export/")
         self.assertTrue(JournalAudit.objects.filter(action="consultation_tableau", details__contains="Comptabilité").exists())
         self.assertTrue(JournalAudit.objects.filter(action="export_excel").exists())
@@ -502,12 +489,12 @@ class AuditTests(Base):
         self.assertTrue(JournalAudit.objects.filter(action="acces_refuse", details="/comptes/").exists())
 
 
-# =========================================================================== Employés (RH)
+# =========================================================================== Employés
 
 class EmployesTests(Base):
     def setUp(self):
         super().setUp()
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
 
     def enregistrer(self, **donnees):
         donnees.setdefault("photo", photo())
@@ -575,20 +562,13 @@ class BaseDeDonneesTests(Base):
 
 class AjouterSupprimerTests(Base):
     def test_supprimer_service_vide_seulement(self):
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
         vide = Service.objects.create(nom="Logistique")
         self.client.post(f"/employes/services/{self.compta.id}/supprimer/")
         self.assertTrue(Service.objects.filter(pk=self.compta.pk).exists())  # employés rattachés
         self.client.post(f"/employes/services/{vide.id}/supprimer/")
         self.assertFalse(Service.objects.filter(pk=vide.pk).exists())
         self.assertTrue(JournalAudit.objects.filter(action="service_supprime").exists())
-
-    def test_service_d_un_chef_non_supprimable(self):
-        vide = Service.objects.create(nom="Sécurité")
-        self.compte("chef.secu", Profil.CHEF, service=vide)
-        self.connecter(Profil.ADMIN)
-        self.client.post(f"/employes/services/{vide.id}/supprimer/")
-        self.assertTrue(Service.objects.filter(pk=vide.pk).exists())
 
     def test_supprimer_un_compte(self):
         self.connecter(Profil.ADMIN)
@@ -605,9 +585,9 @@ class AjouterSupprimerTests(Base):
         self.client.post(f"/comptes/{admin.id}/", {"action": "supprimer", "confirmation": admin.username})
         self.assertTrue(User.objects.filter(pk=admin.pk).exists())
 
-    def test_rh_ne_peut_pas_supprimer_de_compte(self):
-        u = self.compte("x", Profil.BORNE)
-        self.connecter(Profil.RH)
+    def test_utilisateur_ne_peut_pas_supprimer_de_compte(self):
+        u = self.compte("x", Profil.EMPLOYE, employe=self.ali)
+        self.connecter(Profil.EMPLOYE, employe=self.oumar)
         self.assertEqual(self.client.post(f"/comptes/{u.id}/", {"action": "supprimer", "confirmation": "x"}).status_code, 403)
 
 
@@ -622,7 +602,7 @@ class CorrectionsTests(Base):
 
     def test_sortie_oubliee_signalee_puis_corrigee(self):
         debut = self.entree_hier(self.ali)
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
         jour = debut.strftime("%Y-%m-%d")
         r = self.client.get(f"/tableau/?date={jour}")
         self.assertContains(r, "Sortie manquante")
@@ -637,7 +617,7 @@ class CorrectionsTests(Base):
         self.assertTrue(JournalAudit.objects.filter(action="pointage_manuel_ajoute", details__contains="Ali").exists())
 
     def test_correction_refusee_sans_motif_ou_dans_le_futur(self):
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
         demain = (timezone.localdate() + timedelta(days=1)).isoformat()
         aujourdhui = timezone.localdate().isoformat()
         self.client.post("/pointages/manuel/", {"employe": self.ali.id, "type": "S", "date": demain, "heure": "10:00",
@@ -648,15 +628,15 @@ class CorrectionsTests(Base):
                                                 "motif": "Motif suffisant"})
         self.assertFalse(Pointage.objects.exists())
 
-    def test_chef_ne_peut_pas_corriger(self):
-        self.connecter(Profil.CHEF, service=self.compta)
+    def test_utilisateur_ne_peut_pas_corriger(self):
+        self.connecter(Profil.EMPLOYE, employe=self.oumar)
         r = self.client.post("/pointages/manuel/", {"employe": self.ali.id, "type": "S",
                                                     "date": timezone.localdate().isoformat(), "heure": "00:01",
                                                     "motif": "Motif suffisant"})
         self.assertEqual(r.status_code, 403)
 
     def test_seules_les_corrections_sont_supprimables(self):
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
         borne = Pointage.objects.create(employe=self.ali, type="E")
         manuel = Pointage.objects.create(employe=self.ali, type="S", manuel=True, motif="test")
         self.assertEqual(self.client.post(f"/pointages/manuel/{borne.id}/supprimer/").status_code, 404)
@@ -665,7 +645,7 @@ class CorrectionsTests(Base):
         self.assertFalse(Pointage.objects.filter(pk=manuel.pk).exists())
 
     def test_redirection_suivante_securisee(self):
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
         r = self.client.post("/pointages/manuel/", {"employe": self.ali.id, "type": "S", "date": "x", "heure": "y",
                                                     "motif": "Motif", "suivant": "https://site-pirate.example/"})
         self.assertEqual(r["Location"], "/tableau/")
@@ -713,7 +693,7 @@ class HebergeurTests(Base):
     def test_blocage_par_visiteur_et_non_global(self):
         """Derrière le répartiteur, 5 échecs d'un visiteur ne doivent pas bloquer les autres."""
         from django.test import Client
-        u = self.compte("rh.ok", Profil.RH)
+        u = self.compte("rh.ok", Profil.ADMIN)
         pirate = Client(REMOTE_ADDR="10.0.0.1", HTTP_X_REAL_IP="203.0.113.9")
         for _ in range(5):
             pirate.post("/connexion/", {"username": "autre", "password": "faux"})
@@ -771,11 +751,10 @@ class TelephoneTests(Base):
     def test_visage_inconnu_refuse(self):
         self.assertEqual(self.envoyer(signature(77)).status_code, 403)
 
-    def test_reservee_au_role_employe(self):
-        for role in (Profil.BORNE, Profil.RH, Profil.CHEF):
-            self.client.logout()
-            self.connecter(role, service=self.compta if role == Profil.CHEF else None)
-            self.assertEqual(self.envoyer(variante(ALI)).status_code, 403, role)
+    def test_reservee_au_role_utilisateur(self):
+        self.client.logout()
+        self.connecter(Profil.ADMIN)
+        self.assertEqual(self.envoyer(variante(ALI)).status_code, 403)
 
     @override_settings(POINTAGE_TELEPHONE_RESEAUX=["41.188.10.0/24"])
     def test_restriction_au_wifi_du_bureau(self):
@@ -791,9 +770,9 @@ class TelephoneTests(Base):
         self.assertEqual(self.envoyer(variante(ALI)).status_code, 403)
         self.assertRedirects(self.client.get("/accueil/"), "/mon-espace/")
 
-    def test_rh_cree_l_acces_depuis_la_fiche(self):
+    def test_admin_cree_l_acces_depuis_la_fiche(self):
         self.client.logout()
-        self.connecter(Profil.RH)
+        self.connecter(Profil.ADMIN)
         r = self.client.post(f"/employes/{self.oumar.id}/acces/", {"identifiant": ""}, follow=True)
         self.assertContains(r, "oumar.diallo")
         profil = Profil.objects.get(employe=self.oumar)
@@ -857,9 +836,9 @@ class LieuTests(Base):
         self.lieu.save()
         self.assertEqual(self.envoyer(variante(ALI)).status_code, 200)
 
-    def test_la_borne_n_est_pas_concernee(self):
+    def test_le_poste_admin_n_est_pas_concerne(self):
         self.client.logout()
-        self.connecter(Profil.BORNE)
+        self.connecter(Profil.ADMIN)
         self.assertEqual(self.pointer(self.ali, variante(ALI)).status_code, 200)
 
     def test_admin_enregistre_le_lieu(self):

@@ -1,8 +1,8 @@
 # Déploiement sur PythonAnywhere
 
 PythonAnywhere héberge l'application sur Internet, avec une adresse du type
-**`https://VOTRE_NOM.pythonanywhere.com`**. Le **HTTPS est fourni** : la caméra fonctionne directement sur la borne
-et sur tous les appareils, sans installer de certificat.
+**`https://VOTRE_NOM.pythonanywhere.com`**. Le **HTTPS est fourni** : la caméra et la localisation fonctionnent directement
+sur les téléphones des employés, sans installer de certificat.
 
 > Dans ce guide, remplacez **`medou551`** par votre nom d'utilisateur PythonAnywhere.
 
@@ -18,7 +18,7 @@ et sur tous les appareils, sans installer de certificat.
   1 application, environ 512 Mo de disque, temps de calcul limité, une seule tâche planifiée,
   et il faut cliquer « Run until 3 months from today » dans l'onglet *Web* tous les 3 mois.
   Les photos font environ 50 à 100 Ko et sont supprimées après 30 jours : comptez ~100 Mo pour 50 employés.
-- La reconnaissance du visage tourne **dans le navigateur de la borne**, pas sur le serveur : un compte gratuit suffit.
+- La reconnaissance du visage tourne **dans le navigateur du téléphone**, pas sur le serveur : un compte gratuit suffit.
 
 ## 1. Récupérer le code
 

@@ -1,6 +1,11 @@
 {% extends "pointage/base.html" %}
-{% block titre %}Connexion — Gestion de présence{% endblock %}
+{% block titre %}Connexion — AlyGo Présence{% endblock %}
 {% block contenu %}
+{% load static %}
+<div class="page-connexion">
+  <div class="logo-fond"><img src="{% static 'pointage/marque/alygo_noir.png' %}" alt="AlyGo"></div>
+  <p>Pointage des employés</p>
+</div>
 <div class="carte connexion">
   <h1 style="margin-top:0;font-size:22px">Connexion</h1>
   {% if bloque %}

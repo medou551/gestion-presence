@@ -12,7 +12,7 @@ urlpatterns = [
     path("sans-role/", views.aucun_role, name="aucun_role"),
     path("diagnostic/", views.diagnostic, name="diagnostic"),
 
-    # Borne (compte « Borne » uniquement)
+    # Poste de pointage commun (administrateur uniquement)
     path("", views.borne, name="borne"),
     path("pointer/", views.pointer, name="pointer"),
 
@@ -20,7 +20,7 @@ urlpatterns = [
     path("pointer-telephone/", views.pointer_telephone, name="pointer_telephone"),
     path("pointer-telephone/envoyer/", views.pointer_moi, name="pointer_moi"),
 
-    # Gestion (Admin, RH, Chef de service)
+    # Gestion (administrateur)
     path("tableau/", views.tableau, name="tableau"),
     path("export/", views.export_excel, name="export"),
     path("photos/pointage/<int:pk>/", views.photo_pointage, name="photo_pointage"),
@@ -28,7 +28,7 @@ urlpatterns = [
     path("pointages/manuel/<int:pk>/supprimer/", views_gestion.supprimer_pointage_manuel, name="supprimer_pointage_manuel"),
     path("photos/reference/<int:pk>/", views.photo_reference, name="photo_reference"),
 
-    # Employés (Admin, RH)
+    # Employés (administrateur)
     path("employes/", views_gestion.employes, name="employes"),
     path("employes/enregistrer/", views_gestion.enregistrer_employe, name="enregistrer_employe"),
     path("employes/services/", views_gestion.ajouter_service, name="ajouter_service"),

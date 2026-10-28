@@ -1,5 +1,5 @@
 {% extends "pointage/base.html" %}
-{% block titre %}Mon espace — Gestion de présence{% endblock %}
+{% block titre %}Mon espace — AlyGo Présence{% endblock %}
 {% block contenu %}
 <div class="entete-jour">
   <h1>Bonjour {{ employe.nom }}</h1>
@@ -29,10 +29,10 @@
     {% for j in jours %}
       <tr>
         <td>{{ j.jour|date:"l j F"|capfirst }}</td>
-        <td class="num">{% if j.entree.photo %}<img class="photo-mini" src="{% url 'photo_pointage' j.entree.id %}" alt="" loading="lazy">{% endif %} {{ j.entree.horodatage|time:"H:i:s" }}{% if j.entree.manuel %} <span class="pastille manuel" title="{{ j.entree.motif }}">Corrigé par les RH</span>{% elif j.entree.source == "telephone" %} <span title="Téléphone">📱</span>{% endif %}</td>
-        <td class="num">{% if j.sortie %}{% if j.sortie.photo %}<img class="photo-mini" src="{% url 'photo_pointage' j.sortie.id %}" alt="" loading="lazy">{% endif %} {{ j.sortie.horodatage|time:"H:i:s" }}{% if j.sortie.manuel %} <span class="pastille manuel" title="{{ j.sortie.motif }}">Corrigé par les RH</span>{% elif j.sortie.source == "telephone" %} <span title="Téléphone">📱</span>{% endif %}{% else %}—{% endif %}</td>
+        <td class="num">{% if j.entree.photo %}<img class="photo-mini" src="{% url 'photo_pointage' j.entree.id %}" alt="" loading="lazy">{% endif %} {{ j.entree.horodatage|time:"H:i:s" }}{% if j.entree.manuel %} <span class="pastille manuel" title="{{ j.entree.motif }}">Corrigé par l'administrateur</span>{% elif j.entree.source == "telephone" %} <span title="Téléphone">📱</span>{% endif %}</td>
+        <td class="num">{% if j.sortie %}{% if j.sortie.photo %}<img class="photo-mini" src="{% url 'photo_pointage' j.sortie.id %}" alt="" loading="lazy">{% endif %} {{ j.sortie.horodatage|time:"H:i:s" }}{% if j.sortie.manuel %} <span class="pastille manuel" title="{{ j.sortie.motif }}">Corrigé par l'administrateur</span>{% elif j.sortie.source == "telephone" %} <span title="Téléphone">📱</span>{% endif %}{% else %}—{% endif %}</td>
         <td class="num">{{ j.duree }}</td>
-        <td>{% if j.ouvert %}<span class="pastille travail">En cours</span>{% endif %}{% if j.manquante %}<span class="pastille retard" title="Signalez l'heure de sortie aux RH">Sortie non pointée</span>{% endif %}{% if j.retard %}<span class="pastille retard">Retard</span>{% endif %}</td>
+        <td>{% if j.ouvert %}<span class="pastille travail">En cours</span>{% endif %}{% if j.manquante %}<span class="pastille retard" title="Signalez l'heure de sortie à l'administrateur">Sortie non pointée</span>{% endif %}{% if j.retard %}<span class="pastille retard">Retard</span>{% endif %}</td>
       </tr>
     {% endfor %}
     </tbody>
@@ -46,8 +46,8 @@
   <ul class="aide">
     <li>Votre photo de référence et la signature de votre visage sont <strong>chiffrées</strong> et servent uniquement à vérifier vos pointages.</li>
     <li>Les photos prises à chaque pointage sont supprimées automatiquement après {{ conservation }} jours.</li>
-    <li>Seuls les RH, l'administrateur et votre chef de service voient vos pointages. Chaque consultation est enregistrée.</li>
-    <li>Pour corriger une erreur ou demander l'effacement de vos données, adressez-vous aux RH.</li>
+    <li>Seul l'administrateur voit vos pointages. Chaque consultation est enregistrée.</li>
+    <li>Pour corriger une erreur ou demander l'effacement de vos données, adressez-vous à l'administrateur.</li>
   </ul>
   <a class="bouton" href="{% url 'mes_donnees' %}">Télécharger mes données (.xlsx)</a>
 </div>

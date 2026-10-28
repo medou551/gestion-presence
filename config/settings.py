@@ -213,7 +213,6 @@ SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = 8 * 3600              # 8 heures maximum pour une session de travail
 SESSION_INACTIVITE_MINUTES = 30            # déconnexion après 30 minutes sans activité
-SESSION_BORNE_JOURS = 30                   # la borne reste connectée 30 jours
 
 if HTTPS:
     SESSION_COOKIE_SECURE = True

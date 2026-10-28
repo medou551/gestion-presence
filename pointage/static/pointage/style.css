@@ -1,22 +1,27 @@
 :root {
-  --fond: #f4f6f8; --carte: #ffffff; --texte: #1d2733; --doux: #66727f;
-  --bleu: #1f4e78; --bleu-clair: #e6eef6; --vert: #1e8449; --vert-clair: #e3f4ea;
+  /* Couleurs AlyGo : jaune #FFD505 et noir */
+  --jaune: #ffd505; --jaune-clair: #fff3b0; --noir: #111111;
+  --fond: #f7f6f1; --carte: #ffffff; --texte: #161616; --doux: #5f5f5a;
+  --bleu: #111111; --bleu-clair: #fff3b0; --vert: #1e8449; --vert-clair: #e3f4ea;
   --rouge: #b03a2e; --rouge-clair: #fbe9e7; --orange: #b9770e; --orange-clair: #fdf2e0;
   --bord: #dde3e9; --rayon: 10px;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
-body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; background: var(--fond); color: var(--texte); }
-a { color: var(--bleu); }
-header.barre { background: var(--bleu); color: #fff; padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-header.barre a { color: #fff; text-decoration: none; margin-left: 16px; font-size: 14px; opacity: .9; }
-header.barre a:hover { opacity: 1; text-decoration: underline; }
-header.barre .titre { font-weight: 700; font-size: 18px; }
+body { margin: 0; font-family: "Nunito", "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: var(--fond); color: var(--texte); }
+a { color: var(--noir); text-decoration-color: var(--jaune); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+header.barre { background: var(--jaune); color: var(--noir); padding: 10px 20px; border-bottom: 3px solid var(--noir); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+header.barre a { color: var(--noir); text-decoration: none; margin-left: 16px; font-size: 14px; font-weight: 600; }
+header.barre a:hover { text-decoration: underline; text-decoration-color: var(--noir); }
+header.barre .titre { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 15px; text-decoration: none; margin: 0; }
+header.barre .titre img { height: 34px; width: auto; display: block; }
+header.barre .titre span { border-left: 2px solid var(--noir); padding-left: 10px; letter-spacing: .5px; text-transform: uppercase; }
 main { max-width: 1150px; margin: 0 auto; padding: 20px 16px 40px; }
 .carte { background: var(--carte); border: 1px solid var(--bord); border-radius: var(--rayon); padding: 18px; }
-button, .bouton { font: inherit; border: 0; border-radius: 8px; padding: 10px 18px; cursor: pointer; background: var(--bleu); color: #fff; text-decoration: none; display: inline-block; }
+button, .bouton { font: inherit; border: 0; border-radius: 8px; padding: 10px 18px; cursor: pointer; background: var(--noir); color: var(--jaune); font-weight: 700; text-decoration: none; display: inline-block; }
+button:hover:not(:disabled), .bouton:hover { filter: brightness(1.25); }
 button:disabled { opacity: .5; cursor: not-allowed; }
-.bouton.secondaire { background: var(--bleu-clair); color: var(--bleu); }
+.bouton.secondaire, button.secondaire { background: var(--jaune-clair); color: var(--noir); }
 input[type=text], input[type=password], input[type=date] { font: inherit; padding: 9px 12px; border: 1px solid var(--bord); border-radius: 8px; background: #fff; }
 
 /* ---------- Borne ---------- */
@@ -106,7 +111,7 @@ h2 { font-size: 18px; margin: 26px 0 10px; }
 header.barre nav { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 0; }
 header.barre .qui { margin-left: 16px; font-size: 13px; opacity: .8; padding: 3px 8px; border: 1px solid rgba(255,255,255,.35); border-radius: 99px; }
 .form-deconnexion { display: inline; margin: 0; }
-.lien-bouton { background: none; padding: 0; margin-left: 16px; font-size: 14px; color: #fff; opacity: .9; }
+.lien-bouton { background: none; padding: 0; margin-left: 16px; font-size: 14px; font-weight: 600; color: var(--noir); }
 .lien-bouton:hover { opacity: 1; text-decoration: underline; }
 select { font: inherit; padding: 9px 12px; border: 1px solid var(--bord); border-radius: 8px; background: #fff; color: var(--texte); }
 .champ select { display: block; width: 100%; margin-top: 4px; }
@@ -175,3 +180,15 @@ table.diagnostic .aide { margin-top: 3px; font-size: 12px; word-break: break-wor
 .etat-position { margin: 10px 0; padding: 10px 12px; border-radius: 8px; background: var(--bleu-clair); color: var(--bleu); font-weight: 600; }
 .etat-position.ok { background: var(--vert-clair); color: var(--vert); }
 .etat-position.erreur { background: var(--rouge-clair); color: var(--rouge); }
+
+/* ---------- Identité AlyGo ---------- */
+.gros { background: var(--jaune); color: var(--noir); border: 3px solid var(--noir); font-weight: 800; letter-spacing: .3px; }
+.gros:disabled { background: #eee; border-color: #ccc; color: #888; }
+.horloge .heure { color: var(--noir); }
+.stat .valeur { color: var(--noir); }
+.stat { border-top: 4px solid var(--jaune) !important; }
+header.barre .qui { background: var(--noir); color: var(--jaune); border-color: var(--noir) !important; opacity: 1; }
+.page-connexion { text-align: center; margin: 10px auto 18px; }
+.page-connexion .logo-fond { display: inline-block; background: var(--jaune); border: 3px solid var(--noir); border-radius: 18px; padding: 18px 28px; }
+.page-connexion img { height: 64px; width: auto; display: block; }
+.page-connexion p { margin: 10px 0 0; color: var(--doux); font-weight: 600; }

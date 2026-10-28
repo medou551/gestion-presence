@@ -1,0 +1,12 @@
+{
+  "name": "AlyGo Présence",
+  "short_name": "AlyGo",
+  "start_url": "/accueil/",
+  "display": "standalone",
+  "background_color": "#ffd505",
+  "theme_color": "#ffd505",
+  "icons": [
+    {"src": "icone-180.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "icone-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

@@ -109,7 +109,7 @@ class Pointage(models.Model):
     ENTREE, SORTIE = "E", "S"
     TYPES = [(ENTREE, "Entrée"), (SORTIE, "Sortie")]
     BORNE, TELEPHONE = "borne", "telephone"
-    SOURCES = [(BORNE, "Borne"), (TELEPHONE, "Téléphone de l'employé")]
+    SOURCES = [(BORNE, "Poste de pointage"), (TELEPHONE, "Téléphone de l'employé")]
 
     employe = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name="pointages")
     type = models.CharField(max_length=1, choices=TYPES)
@@ -124,7 +124,7 @@ class Pointage(models.Model):
     # Distance entre ce visage et la photo de référence (0 = identique ; plus petit = plus ressemblant)
     distance = models.FloatField(null=True, blank=True, editable=False)
     adresse_ip = models.GenericIPAddressField(null=True, blank=True)
-    # Correction manuelle (oubli de pointage) : saisie par les RH avec un motif, jamais par la borne
+    # Correction manuelle (oubli de pointage) : saisie par l'administrateur avec un motif
     manuel = models.BooleanField("Saisie manuelle", default=False)
     motif = models.CharField("Motif de la correction", max_length=200, blank=True)
     saisi_par = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
@@ -151,7 +151,7 @@ class Pointage(models.Model):
             if self.lieu_id and self.distance_lieu_m is not None:
                 return f"Téléphone ({self.distance_lieu_m:.0f} m de {self.lieu.nom})"
             return "Téléphone"
-        return "Borne"
+        return "Poste de pointage"
 
     @property
     def descripteur(self):
@@ -187,14 +187,14 @@ class Pointage(models.Model):
 # ---------------------------------------------------------------- Rôles
 
 class Profil(models.Model):
-    ADMIN, RH, CHEF, BORNE, EMPLOYE = "admin", "rh", "chef", "borne", "employe"
+    # Deux rôles seulement : l'administrateur gère tout, l'utilisateur (employé) pointe avec son téléphone.
+    ADMIN, EMPLOYE = "admin", "employe"
     ROLES = [
         (ADMIN, "Administrateur"),
-        (RH, "Ressources humaines"),
-        (CHEF, "Chef de service"),
-        (BORNE, "Borne de pointage"),
-        (EMPLOYE, "Employé"),
+        (EMPLOYE, "Utilisateur (employé)"),
     ]
+    # Anciens rôles (versions précédentes) : ces comptes sont désactivés et n'ont plus aucun accès
+    ANCIENS_ROLES = ("rh", "chef", "borne")
 
     utilisateur = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profil")
     role = models.CharField("Rôle", max_length=10, choices=ROLES)

@@ -1,4 +1,4 @@
-"""Pages de gestion : employés (RH/Admin), comptes et journal d'audit (Admin)."""
+"""Pages de gestion (administrateur) : employés, comptes, lieux et journal d'audit."""
 import secrets
 import string
 
@@ -17,7 +17,7 @@ from django.views.decorators.http import require_POST
 
 from . import geo, visage
 from .models import Employe, JournalAudit, Lieu, Pointage, Profil, Service
-from .roles import ADMIN, RH, journaliser, role_de, role_requis
+from .roles import ADMIN, journaliser, role_de, role_requis
 from .views import _erreur, _verifier_photo
 
 User = get_user_model()
@@ -25,7 +25,7 @@ User = get_user_model()
 
 # ---------------------------------------------------------------- Employés
 
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def employes(request):
     liste = Employe.objects.select_related("service").all()
     return render(request, "pointage/employes.html", {
@@ -36,7 +36,7 @@ def employes(request):
 
 
 @require_POST
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def ajouter_service(request):
     nom = " ".join(request.POST.get("nom", "").split())[:100]
     if nom:
@@ -48,7 +48,7 @@ def ajouter_service(request):
 
 
 @require_POST
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def supprimer_service(request, pk):
     service = get_object_or_404(Service, pk=pk)
     nb_emp = service.employes.count()
@@ -71,7 +71,7 @@ def _lire_pin(valeur):
 
 
 @require_POST
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def enregistrer_employe(request):
     """Crée un employé (ou met à jour sa photo de référence) avec la signature de son visage."""
     employe_id = request.POST.get("employe", "").strip()
@@ -126,7 +126,7 @@ def enregistrer_employe(request):
     return JsonResponse({"ok": True, "message": f"Photo de référence enregistrée pour {emp.nom}.", "id": emp.pk})
 
 
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def modifier_employe(request, pk):
     emp = get_object_or_404(Employe, pk=pk)
     erreurs = []
@@ -176,7 +176,7 @@ def _identifiant_propose(nom):
 
 
 @require_POST
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def creer_acces_employe(request, pk):
     """Crée le compte « Employé » qui permet de pointer avec son téléphone et de voir son historique."""
     emp = get_object_or_404(Employe, pk=pk)
@@ -201,7 +201,7 @@ def creer_acces_employe(request, pk):
 
 
 @require_POST
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def effacer_biometrie(request, pk):
     """Pour un employé qui quitte l'entreprise : supprime photos et signatures, garde les heures."""
     emp = get_object_or_404(Employe, pk=pk)
@@ -249,7 +249,7 @@ def _appliquer_role(user, role, service, employe):
     user.save()
     profil, _ = Profil.objects.get_or_create(utilisateur=user, defaults={"role": role})
     profil.role = role
-    profil.service = service if role == Profil.CHEF else None
+    profil.service = None
     profil.employe = employe if role == Profil.EMPLOYE else None
     profil.save()
     return profil
@@ -262,8 +262,6 @@ def _valider_role(request, user=None):
     sid, eid = request.POST.get("service", ""), request.POST.get("employe", "")
     service = Service.objects.filter(pk=sid).first() if sid.isdigit() else None
     employe = Employe.objects.filter(pk=eid).first() if eid.isdigit() else None
-    if role == Profil.CHEF and not service:
-        return None, None, None, "Un chef de service doit être rattaché à un service."
     if role == Profil.EMPLOYE:
         if not employe:
             return None, None, None, "Un compte employé doit être relié à un employé."
@@ -457,7 +455,7 @@ def _retour_tableau(request):
 
 
 @require_POST
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def ajouter_pointage_manuel(request):
     """Ajoute une entrée ou une sortie oubliée. Motif obligatoire, journalisé, marqué « manuel »."""
     eid = request.POST.get("employe", "")
@@ -499,7 +497,7 @@ def ajouter_pointage_manuel(request):
 
 
 @require_POST
-@role_requis(ADMIN, RH)
+@role_requis(ADMIN)
 def supprimer_pointage_manuel(request, pk):
     """Seules les corrections manuelles peuvent être supprimées ; les pointages de la borne sont intouchables."""
     p = get_object_or_404(Pointage, pk=pk, manuel=True)

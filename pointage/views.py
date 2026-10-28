@@ -10,8 +10,8 @@ from django.views.decorators.http import require_POST
 
 from . import geo, taches, visage
 from .models import Employe, Lieu, Pointage, Service, resume_journee
-from .roles import (ADMIN, BORNE, CHEF, EMPLOYE, GESTION, RH, employe_du_compte, employes_visibles,
-                    journaliser, pointages_visibles, role_de, role_requis, service_du_chef)
+from .roles import (ADMIN, EMPLOYE, employe_du_compte, employes_visibles, journaliser, pointages_visibles,
+                    role_requis)
 
 TAILLE_MAX_PHOTO = 5 * 1024 * 1024  # 5 Mo
 
@@ -62,9 +62,9 @@ def _bornes_jour(jour):
 
 # ---------------------------------------------------------------- Borne de pointage
 
-@role_requis(BORNE, ADMIN)
+@role_requis(ADMIN)
 def borne(request):
-    """Page affichée sur le poste de pointage. Réservée au compte « Borne »."""
+    """Pointage sur un poste commun, ouvert par l'administrateur (ex. téléphone d'un employé en panne)."""
     employes = [{"id": e.id, "nom": e.nom, "poste": e.poste, "pin": e.demande_pin, "ref": e.a_reference}
                 for e in Employe.objects.filter(actif=True)]
     return render(request, "pointage/borne.html", {
@@ -80,9 +80,9 @@ def _refus(request, emp, message, status, raison):
 
 
 @require_POST
-@role_requis(BORNE, ADMIN)
+@role_requis(ADMIN)
 def pointer(request):
-    """Pointage depuis la borne commune : l'employé choisit son nom, puis son visage est vérifié."""
+    """Pointage sur le poste commun (administrateur) : on choisit le nom, puis le visage est vérifié."""
     employe_id = request.POST.get("employe", "").strip()
     if not employe_id.isdigit():
         return _erreur("Choisissez votre nom dans la liste.")
@@ -111,10 +111,10 @@ def _reseau_autorise(request):
 def _pointage_telephone_possible(request):
     """Retourne (employé, message d'erreur)."""
     if not settings.POINTAGE_TELEPHONE:
-        return None, "Le pointage par téléphone est désactivé. Utilisez la borne."
+        return None, "Le pointage par téléphone est désactivé. Voyez l'administrateur."
     emp = employe_du_compte(request.user)
     if not emp or not emp.actif:
-        return None, "Ce compte n'est relié à aucun employé actif. Voyez les RH."
+        return None, "Ce compte n'est relié à aucun employé actif. Voyez l'administrateur."
     if not _reseau_autorise(request):
         return emp, "Pointage refusé : connectez-vous au Wi-Fi du bureau pour pointer avec votre téléphone."
     return emp, None
@@ -259,7 +259,7 @@ def _lignes_du_jour(jour, employes):
         if not entree:
             statut = "Absent"
         elif ouvert and jour < timezone.localdate():
-            statut = "Sortie manquante"   # oubli de pointage : à corriger par les RH
+            statut = "Sortie manquante"   # oubli de pointage : à corriger par l'administrateur
         elif ouvert:
             statut = "Au travail"
         else:
@@ -273,21 +273,19 @@ def _lignes_du_jour(jour, employes):
 
 
 def _filtre_service(request):
-    """Admin/RH peuvent filtrer par service ; le chef est limité au sien."""
+    """L'administrateur peut filtrer par service."""
     employes = employes_visibles(request.user).filter(actif=True).select_related("service")
-    services = Service.objects.all() if role_de(request.user) in (ADMIN, RH) else []
+    services = Service.objects.all()
     service_choisi = None
     sid = request.GET.get("service", "")
     if services and sid.isdigit():
         service_choisi = Service.objects.filter(pk=int(sid)).first()
         if service_choisi:
             employes = employes.filter(service=service_choisi)
-    if role_de(request.user) == CHEF:
-        service_choisi = service_du_chef(request.user)
     return employes, services, service_choisi
 
 
-@role_requis(*GESTION)
+@role_requis(ADMIN)
 def tableau(request):
     taches.purge_si_necessaire()
     aujourdhui = timezone.localdate()
@@ -311,7 +309,7 @@ def tableau(request):
         "est_aujourdhui": jour == aujourdhui, "lignes": lignes, "journal": journal, "stats": stats,
         "heure_arrivee": settings.HEURE_ARRIVEE, "services": services, "service_choisi": service_choisi,
         "conservation": settings.DUREE_CONSERVATION_PHOTOS_JOURS,
-        "peut_corriger": role_de(request.user) in (ADMIN, RH),
+        "peut_corriger": True,
         "heure_actuelle": timezone.localtime().strftime("%H:%M"),
     })
 
@@ -343,7 +341,7 @@ def _reponse_excel(contenu, nom):
     return r
 
 
-@role_requis(*GESTION)
+@role_requis(ADMIN)
 def export_excel(request):
     aujourdhui = timezone.localdate()
     du = _lire_date(request.GET.get("du"), aujourdhui.replace(day=1))
@@ -392,13 +390,13 @@ def _envoyer_photo(champ):
     return r
 
 
-@role_requis(ADMIN, RH, CHEF, EMPLOYE)
+@role_requis(ADMIN, EMPLOYE)
 def photo_pointage(request, pk):
     p = get_object_or_404(pointages_visibles(request.user), pk=pk)
     return _envoyer_photo(p.photo)
 
 
-@role_requis(ADMIN, RH, CHEF, EMPLOYE)
+@role_requis(ADMIN, EMPLOYE)
 def photo_reference(request, pk):
     e = get_object_or_404(employes_visibles(request.user), pk=pk)
     return _envoyer_photo(e.photo_reference)

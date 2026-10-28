@@ -1,15 +1,16 @@
 # Guide d'utilisation : ajouter et supprimer
 
 Ce guide explique comment ajouter et supprimer les services, les employés, les comptes et les pointages oubliés.
-Chaque action est enregistrée dans le **Journal** (menu de l'administrateur).
+Il n'y a que **deux rôles** : l'**Administrateur** (fait tout ce qui est décrit ici) et l'**Utilisateur (employé)**,
+qui pointe avec son téléphone et consulte ses heures. Chaque action est enregistrée dans le **Journal**.
 
-| Quoi | Ajouter | Modifier | Supprimer | Qui |
-|---|---|---|---|---|
-| Service | Employés → « Services » → Ajouter | Administration | × à côté du nom (s'il est vide) | Admin, RH |
-| Employé | Employés → formulaire « Nouvel employé » | Employés → Modifier | Employés → Modifier → bas de page | Admin, RH (suppression complète : Admin) |
-| Photo de référence | Employés → Ajouter la photo | Employés → Changer la photo | Employés → Modifier → Effacer les données biométriques | Admin, RH |
-| Compte (connexion) | Comptes → « Nouveau compte » | Comptes → Gérer | Comptes → Gérer → Supprimer le compte | Admin |
-| Pointage oublié | Tableau de bord → « Corriger un oubli » | — | « Supprimer » sur la correction | Admin, RH |
+| Quoi | Ajouter | Modifier | Supprimer |
+|---|---|---|---|
+| Service | Employés → « Services » → Ajouter | Administration | × à côté du nom (s'il est vide) |
+| Employé | Employés → formulaire « Nouvel employé » | Employés → Modifier | Employés → Modifier → bas de page |
+| Photo de référence | Employés → Ajouter la photo | Employés → Changer la photo | Employés → Modifier → Effacer les données biométriques |
+| Compte (connexion) | Comptes → « Nouveau compte » | Comptes → Gérer | Comptes → Gérer → Supprimer le compte |
+| Pointage oublié | Tableau de bord → « Corriger un oubli » | — | « Supprimer » sur la correction |
 
 ---
 
@@ -19,7 +20,7 @@ Chaque action est enregistrée dans le **Journal** (menu de l'administrateur).
 
 **Supprimer** : cliquez la **×** à côté du nom du service, puis confirmez.
 Un service ne peut être supprimé que s'il est **vide** : changez d'abord le service de ses employés
-(Employés → Modifier) et de son chef (Comptes → Gérer).
+(Employés → Modifier).
 
 ## Les employés
 
@@ -28,7 +29,7 @@ Un service ne peut être supprimé que s'il est **vide** : changez d'abord le se
 2. **📷 Prendre la photo** (l'employé face à la caméra) ou **Choisir un fichier**.
 3. Attendez « Visage détecté », puis **Enregistrer**.
 
-Le même visage ne peut pas être enregistré pour deux employés. L'employé apparaît immédiatement sur la borne.
+Le même visage ne peut pas être enregistré pour deux employés. Ensuite, créez-lui son accès pour qu'il puisse pointer avec son téléphone (voir plus bas).
 
 **Modifier** : dans la liste, **Modifier** → nom, poste, service, code PIN, actif / inactif.
 **Changer la photo** : bouton **Changer la photo** dans la liste.
@@ -46,11 +47,11 @@ Les heures de présence servent souvent pour la paie : préférez « Effacer les
 ## Les comptes (connexions)
 
 Un **employé** (fiche avec photo, qui pointe) et un **compte** (identifiant + mot de passe pour ouvrir l'application)
-sont deux choses différentes. Un employé n'a pas besoin de compte pour pointer.
+sont deux choses différentes : pour pointer avec son téléphone, l'employé a besoin d'un compte « Utilisateur ».
 
 **Ajouter** (menu **Comptes**, réservé à l'administrateur) :
-1. Identifiant (ex. `fatima.rh`), puis le **rôle** : Administrateur, Ressources humaines, Chef de service
-   (choisir son service), Borne de pointage, ou Employé (choisir l'employé concerné).
+1. Identifiant (ex. `ahmed.salem`), puis le **rôle** : **Administrateur**, ou **Utilisateur (employé)** en choisissant
+   l'employé concerné. (Plus simple pour un employé : Employés → Modifier → **Créer son accès**.)
 2. **Créer le compte** : un mot de passe temporaire s'affiche **une seule fois**. Notez-le et remettez-le en main propre.
 3. À la première connexion, la personne choisit son propre mot de passe (10 caractères minimum).
 
@@ -66,17 +67,16 @@ ni le dernier administrateur.
 Si un employé oublie de pointer sa sortie, le tableau de bord du jour concerné affiche **« Sortie manquante »**
 (et la durée travaillée n'est pas calculée).
 
-**Ajouter la correction** (Admin, RH) : **Tableau de bord** → choisissez la date → section **Corriger un oubli** :
+**Ajouter la correction** : **Tableau de bord** → choisissez la date → section **Corriger un oubli** :
 employé, Entrée ou Sortie, heure, **motif** (obligatoire) → **Ajouter la correction**.
 La ligne apparaît avec l'étiquette **Manuel**, votre nom et le motif ; l'employé la voit dans « Mon espace ».
 
 **Supprimer une correction** : lien **Supprimer** sur la ligne « Manuel » du journal.
-Les pointages faits à la borne ne peuvent être ni modifiés ni supprimés : c'est ce qui garantit leur fiabilité.
+Les pointages faits avec le visage ne peuvent être ni modifiés ni supprimés : c'est ce qui garantit leur fiabilité.
 
 ## Pointer avec son téléphone
 
-Chaque employé peut pointer depuis **son propre téléphone**, sans passer par la borne. Son visage est vérifié comme
-à la borne, l'heure est celle du serveur, et il ne peut pointer **que pour lui-même** (son compte).
+Chaque employé pointe depuis **son propre téléphone**. Son visage est vérifié, l'heure est celle du serveur, et il ne peut pointer **que pour lui-même** (son compte).
 
 **1. Définir le lieu autorisé (une fois, administrateur, sur place)**
 1. Allez **au centre du bureau (Beitik Soukouk)** avec votre téléphone, GPS activé.
@@ -89,7 +89,7 @@ Un GPS trop imprécis (plus de 50 m) est aussi refusé. Sans aucun lieu actif, l
 Le rayon se change dans **Lieux** (si des employés au fond du bâtiment sont refusés, passez à 30 m).
 Seuls le nom du lieu et la distance sont conservés, jamais les coordonnées GPS des employés.
 
-**2. Donner l'accès à un employé (Admin ou RH)**
+**2. Donner l'accès à un employé**
 **Employés** → **Modifier** → section *Pointage avec son téléphone* → **Créer son accès**.
 Notez l'identifiant et le mot de passe temporaire affichés et donnez-les à l'employé.
 (L'employé doit avoir une photo de référence.)
@@ -101,6 +101,12 @@ Notez l'identifiant et le mot de passe temporaire affichés et donnez-les à l'e
    puis appuie sur **Pointer**. L'entrée et la sortie alternent automatiquement.
 
 Dans le tableau de bord, ces pointages portent l'étiquette **📱 Téléphone** avec la distance au lieu.
+
+## Le poste de pointage (administrateur)
+
+Le menu **Poste de pointage** ouvre la page où l'on choisit un nom puis on vérifie le visage, sur l'appareil de
+l'administrateur. Utile si le téléphone d'un employé est en panne : l'administrateur reste à côté, puis se déconnecte.
+Ne laissez jamais un appareil connecté en administrateur sans surveillance.
 
 ## Mot de passe oublié
 

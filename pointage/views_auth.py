@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.shortcuts import redirect
 from django.urls import reverse, reverse_lazy
 
-from .roles import ADMIN, BORNE, CHEF, EMPLOYE, RH, journaliser, role_de
+from .roles import ADMIN, EMPLOYE, journaliser, role_de
 
 
 def _cles_blocage(request, nom):
@@ -57,9 +57,6 @@ class Connexion(auth_views.LoginView):
         reponse = super().form_valid(form)
         user = form.get_user()
         effacer_echecs(self.request, user.get_username())
-        if role_de(user) == BORNE:
-            # La borne reste connectée longtemps ; les autres comptes : 8 h maximum
-            self.request.session.set_expiry(settings.SESSION_BORNE_JOURS * 86400)
         self.request.session["derniere_activite"] = int(time.time())
         journaliser(self.request, "connexion_reussie", utilisateur=user)
         return reponse
@@ -103,11 +100,9 @@ def accueil(request):
     if not request.user.is_authenticated:
         return redirect(settings.LOGIN_URL)
     role = role_de(request.user)
-    if role == BORNE:
-        return redirect(reverse("borne"))
     if role == EMPLOYE:
         # Sur téléphone, l'employé arrive directement sur la page de pointage
         return redirect(reverse("pointer_telephone" if settings.POINTAGE_TELEPHONE else "mon_espace"))
-    if role in (ADMIN, RH, CHEF):
+    if role == ADMIN:
         return redirect(reverse("tableau"))
     return redirect(reverse("aucun_role"))

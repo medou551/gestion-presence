@@ -1,5 +1,5 @@
 {% extends "pointage/base.html" %}
-{% block titre %}Comptes — Gestion de présence{% endblock %}
+{% block titre %}Comptes — AlyGo Présence{% endblock %}
 {% block contenu %}
 <div class="entete-jour"><h1>Comptes et rôles</h1></div>
 
@@ -21,11 +21,6 @@
           {% for code, libelle in roles %}<option value="{{ code }}">{{ libelle }}</option>{% endfor %}
         </select>
       </label>
-      <label class="champ si-chef" hidden>Service dirigé *
-        <select name="service"><option value="">— Choisir —</option>
-          {% for s in services %}<option value="{{ s.id }}">{{ s.nom }}</option>{% endfor %}
-        </select>
-      </label>
       <label class="champ si-employe" hidden>Employé concerné *
         <select name="employe"><option value="">— Choisir —</option>
           {% for e in employes_sans_compte %}<option value="{{ e.id }}">{{ e.nom }}</option>{% endfor %}
@@ -37,11 +32,8 @@
 
     <h3>Les rôles</h3>
     <table class="roles">
-      <tr><th>Administrateur</th><td>Tout : comptes, services, employés, tableau, exports, journal d'audit.</td></tr>
-      <tr><th>Ressources humaines</th><td>Employés (ajout, photos de référence, effacement), tableau et exports de tous les services.</td></tr>
-      <tr><th>Chef de service</th><td>Tableau et exports de son service uniquement, en lecture seule.</td></tr>
-      <tr><th>Borne de pointage</th><td>Uniquement la page de pointage. À utiliser sur le poste de pointage.</td></tr>
-      <tr><th>Employé</th><td>Uniquement son historique de présence et le téléchargement de ses données.</td></tr>
+      <tr><th>Administrateur</th><td>Tout : comptes, employés, services, lieux, tableau, corrections, exports, journal d'audit.</td></tr>
+      <tr><th>Utilisateur (employé)</th><td>Pointer avec son téléphone (visage + lieu), voir son historique et télécharger ses données.</td></tr>
     </table>
   </section>
 
@@ -68,9 +60,6 @@
                 <input type="hidden" name="action" value="role">
                 <select name="role" class="choix-role" required>
                   {% for code, libelle in roles %}<option value="{{ code }}"{% if u.profil.role == code or code == 'admin' and u.is_superuser and not u.profil %} selected{% endif %}>{{ libelle }}</option>{% endfor %}
-                </select>
-                <select name="service" class="si-chef"><option value="">Service…</option>
-                  {% for s in services %}<option value="{{ s.id }}"{% if u.profil.service_id == s.id %} selected{% endif %}>{{ s.nom }}</option>{% endfor %}
                 </select>
                 <select name="employe" class="si-employe"><option value="">Employé…</option>
                   {% for e in employes %}<option value="{{ e.id }}"{% if u.profil.employe_id == e.id %} selected{% endif %}>{{ e.nom }}</option>{% endfor %}
@@ -100,11 +89,10 @@
   </section>
 </div>
 <script nonce="{{ request.csp_nonce }}">
-// Affiche le choix du service (chef) ou de l'employé (compte employé) selon le rôle
+// Affiche le choix de l'employé pour un compte utilisateur
 document.querySelectorAll(".choix-role").forEach(sel => {
   const form = sel.form;
   const maj = () => {
-    form.querySelectorAll(".si-chef").forEach(x => { x.hidden = sel.value !== "chef"; });
     form.querySelectorAll(".si-employe").forEach(x => { x.hidden = sel.value !== "employe"; });
   };
   sel.addEventListener("change", maj); maj();

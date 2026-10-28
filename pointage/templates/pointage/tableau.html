@@ -1,5 +1,5 @@
 {% extends "pointage/base.html" %}
-{% block titre %}Tableau de bord — Gestion de présence{% endblock %}
+{% block titre %}Tableau de bord — AlyGo Présence{% endblock %}
 {% block contenu %}
 <div class="entete-jour">
   <h1>Présence du {{ jour|date:"l j F Y" }}{% if service_choisi %} · {{ service_choisi.nom }}{% endif %}</h1>
@@ -44,7 +44,7 @@
         </td>
       </tr>
     {% empty %}
-      <tr><td colspan="6" class="vide">Aucun employé{% if peut_gerer_employes %}. Ajoutez-en dans <a href="{% url 'employes' %}">Employés</a>{% endif %}.</td></tr>
+      <tr><td colspan="6" class="vide">Aucun employé{% if est_admin %}. Ajoutez-en dans <a href="{% url 'employes' %}">Employés</a>{% endif %}.</td></tr>
     {% endfor %}
     </tbody>
   </table>
@@ -79,7 +79,7 @@
         <td>{% if p.employe.photo_reference %}<img class="photo-mini" src="{% url 'photo_reference' p.employe.id %}" alt="Référence" loading="lazy">{% endif %}{% if p.photo %}<img class="photo-mini" src="{% url 'photo_pointage' p.id %}" alt="Photo de {{ p.employe.nom }}" loading="lazy">{% else %}<span class="aide">photo supprimée</span>{% endif %}</td>
         <td class="num">{% if p.ressemblance is not None %}{{ p.ressemblance }} %{% else %}—{% endif %}</td>
         {% endif %}
-        <td>{% if p.source == "telephone" %}<span class="pastille telephone">📱 Téléphone</span><br>{% if p.lieu %}<small>{{ p.distance_lieu_m|floatformat:0 }} m de {{ p.lieu.nom }}</small><br>{% endif %}{% elif not p.manuel %}Borne<br>{% endif %}<small class="aide">{{ p.adresse_ip|default:"—" }}</small></td>
+        <td>{% if p.source == "telephone" %}<span class="pastille telephone">📱 Téléphone</span><br>{% if p.lieu %}<small>{{ p.distance_lieu_m|floatformat:0 }} m de {{ p.lieu.nom }}</small><br>{% endif %}{% elif not p.manuel %}Poste de pointage<br>{% endif %}<small class="aide">{{ p.adresse_ip|default:"—" }}</small></td>
       </tr>
     {% endfor %}
     </tbody>
@@ -101,10 +101,10 @@
   </label>
   <label class="champ">Date<input type="date" name="date" value="{{ jour|date:'Y-m-d' }}" required></label>
   <label class="champ">Heure<input type="time" name="heure" step="1" value="{% if est_aujourdhui %}{{ heure_actuelle }}{% else %}17:00{% endif %}" required></label>
-  <label class="champ large">Motif (obligatoire)<input type="text" name="motif" maxlength="200" minlength="5" required placeholder="Ex. : oubli de pointage à la sortie, confirmé par le chef de service"></label>
+  <label class="champ large">Motif (obligatoire)<input type="text" name="motif" maxlength="200" minlength="5" required placeholder="Ex. : oubli de pointage à la sortie, confirmé par le responsable"></label>
   <button type="submit">Ajouter la correction</button>
   <p class="aide large">La correction est marquée « Manuel », avec votre nom et le motif, et enregistrée dans le journal d'audit.
-    Les pointages de la borne ne peuvent pas être modifiés.</p>
+    Les pointages faits avec le visage ne peuvent pas être modifiés.</p>
 </form>
 {% endif %}
 

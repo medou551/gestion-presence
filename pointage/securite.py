@@ -8,7 +8,7 @@ from django.contrib.auth import logout
 from django.shortcuts import redirect
 from django.urls import reverse
 
-from .roles import BORNE, journaliser, role_de
+from .roles import journaliser, role_de
 
 
 class IPClientMiddleware:
@@ -74,16 +74,15 @@ class SessionMiddleware:
         user = request.user
         if user.is_authenticated and not request.path.startswith(self.CHEMINS_LIBRES[0]):
             role = role_de(user)
-            if role != BORNE:
-                maintenant = int(time.time())
-                derniere = request.session.get("derniere_activite", maintenant)
-                if maintenant - derniere > settings.SESSION_INACTIVITE_MINUTES * 60:
-                    journaliser(request, "deconnexion_inactivite")
-                    logout(request)
-                    return redirect(f"{settings.LOGIN_URL}?expire=1")
-                request.session["derniere_activite"] = maintenant
+            maintenant = int(time.time())
+            derniere = request.session.get("derniere_activite", maintenant)
+            if maintenant - derniere > settings.SESSION_INACTIVITE_MINUTES * 60:
+                journaliser(request, "deconnexion_inactivite")
+                logout(request)
+                return redirect(f"{settings.LOGIN_URL}?expire=1")
+            request.session["derniere_activite"] = maintenant
 
             profil = getattr(user, "profil", None)
-            if profil and profil.doit_changer_mdp and role != BORNE and not request.path.startswith(self.CHEMINS_LIBRES):
+            if profil and profil.doit_changer_mdp and role and not request.path.startswith(self.CHEMINS_LIBRES):
                 return redirect(reverse("changer_mdp"))
         return self.get_response(request)
