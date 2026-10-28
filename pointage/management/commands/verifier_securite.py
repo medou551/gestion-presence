@@ -3,7 +3,8 @@ import stat
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection
 
 from pointage import chiffrement
 from pointage.models import Employe, JournalAudit
@@ -13,6 +14,8 @@ class Command(BaseCommand):
     help = "Vérifie la configuration de sécurité avant la mise en service."
 
     def handle(self, *args, **options):
+        if "pointage_employe" not in connection.introspection.table_names():
+            raise CommandError("La base de données n'est pas encore créée : lancez d'abord « python manage.py initialiser ».")
         ok = self.style.SUCCESS("  OK   ")
         ko = self.style.ERROR("  À FAIRE ")
         info = self.style.WARNING("  INFO ")
