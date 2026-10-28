@@ -968,3 +968,23 @@ class QrTests(Base):
         self.assertGreater(self.client.session.get_expiry_age(), 30 * 86400)
         s = self.client.session; s["derniere_activite"] = int(time.time()) - 5 * 3600; s.save()
         self.assertEqual(self.client.get("/mon-espace/").status_code, 200)  # pas de déconnexion pour inactivité
+
+
+class QrAdminTests(Base):
+    def test_qr_affiche_dans_l_admin_et_scannable(self):
+        admin = self.connecter(Profil.ADMIN)
+        self.assertContains(self.client.get("/qr/"), "Scannez pour pointer")
+        self.assertIn("<svg", self.client.get("/qr/code/").json()["svg"])
+        code = signing.dumps({"a": admin.pk, "n": "x"}, salt=SEL_QR, compress=True)
+        self.client.logout()
+        self.connecter(Profil.EMPLOYE, employe=self.ali)
+        self.assertEqual(self.client.get("/qr/").status_code, 403)  # réservé à l'administrateur
+        r = self.client.post(f"/scan/{code}/valider/")
+        self.assertEqual(r.status_code, 200, r.content)
+        # QR d'un administrateur désactivé : refusé
+        admin.is_active = False; admin.save()
+        Pointage.objects.update(horodatage=timezone.now() - timedelta(minutes=5))
+        self.assertEqual(self.client.post(f"/scan/{code}/valider/").status_code, 403)
+        # Un faux « administrateur » (employé) ne peut pas fabriquer de QR
+        faux = signing.dumps({"a": self.client.session["_auth_user_id"]}, salt="autre")
+        self.assertEqual(self.client.post(f"/scan/{faux}/valider/").status_code, 403)

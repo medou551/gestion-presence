@@ -56,6 +56,8 @@
 <p class="alerte">{{ stats.oublis }} sortie{{ stats.oublis|pluralize }} manquante{{ stats.oublis|pluralize }} ce jour-là : ajoutez-la{{ stats.oublis|pluralize:",s" }} avec le formulaire « Corriger un oubli » ci-dessous.</p>
 {% endif %}
 
+<p><a class="bouton" href="{% url 'qr_admin' %}">▦ Afficher le QR code de pointage</a> <a class="bouton secondaire" href="{% url 'tablettes' %}">Tablette dédiée (sans compte)</a></p>
+
 <h2>Journal des pointages ({{ journal|length }})</h2>
 <div class="carte tableau-defile">
   {% if journal %}

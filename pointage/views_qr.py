@@ -18,7 +18,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import Pointage, Tablette, heures_supplementaires, resume_journee
-from .roles import ADMIN, EMPLOYE, employe_du_compte, journaliser, role_requis
+from .roles import ADMIN, EMPLOYE, employe_du_compte, journaliser, role_de, role_requis
 
 COOKIE_TABLETTE = "tablette_alygo"
 SEL_QR = "pointage.qr"
@@ -86,15 +86,33 @@ def tablette(request):
     })
 
 
+@role_requis(ADMIN)
+def qr_admin(request):
+    """Le QR code affiché directement dans l'espace administrateur (même écran que la tablette)."""
+    return render(request, "pointage/tablette.html", {
+        "mode_admin": True, "serveur_ms": int(timezone.now().timestamp() * 1000), "fuseau": settings.TIME_ZONE,
+        "renouvellement": settings.QR_RENOUVELLEMENT_SECONDES,
+    })
+
+
+@role_requis(ADMIN)
+def qr_admin_code(request):
+    return _reponse_qr(request, {"a": request.user.pk})
+
+
 def tablette_code(request):
     """Nouveau QR code (image SVG) pour la tablette."""
-    import segno
-
     t = _tablette(request)
     if not t:
         return JsonResponse({"ok": False}, status=403)
     Tablette.objects.filter(pk=t.pk).update(derniere_activite=timezone.now(), adresse_ip=request.META.get("REMOTE_ADDR"))
-    code = signing.dumps({"t": t.pk, "n": secrets.token_hex(4)}, salt=SEL_QR, compress=True)
+    return _reponse_qr(request, {"t": t.pk})
+
+
+def _reponse_qr(request, origine):
+    import segno
+
+    code = signing.dumps({**origine, "n": secrets.token_hex(4)}, salt=SEL_QR, compress=True)
     url = request.build_absolute_uri(f"/scan/{code}/")
     svg = segno.make(url, error="m").svg_inline(border=2, dark="#111111", light="#ffffff", omitsize=True)
     r = JsonResponse({"ok": True, "svg": svg, "serveur_ms": int(timezone.now().timestamp() * 1000)})
@@ -108,6 +126,10 @@ def _lire_code(code, marge=0):
         donnees = signing.loads(code, salt=SEL_QR, max_age=settings.QR_VALIDITE_SECONDES + marge)
     except signing.BadSignature:  # comprend SignatureExpired
         return None
+    if "a" in donnees:  # QR affiché par un administrateur connecté
+        from django.contrib.auth import get_user_model
+        admin = get_user_model().objects.filter(pk=donnees["a"], is_active=True).first()
+        return admin if role_de(admin) == ADMIN else None
     return Tablette.objects.filter(pk=donnees.get("t"), active=True).first()
 
 

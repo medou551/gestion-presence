@@ -19,6 +19,8 @@ urlpatterns = [
     # Pointage par QR code : la tablette l'affiche, l'employé le scanne avec son téléphone
     path("tablette/", views_qr.tablette, name="tablette"),
     path("tablette/code/", views_qr.tablette_code, name="tablette_code"),
+    path("qr/", views_qr.qr_admin, name="qr_admin"),
+    path("qr/code/", views_qr.qr_admin_code, name="qr_admin_code"),
     path("tablettes/", views_qr.tablettes, name="tablettes"),
     path("tablettes/activer/", views_qr.activer_tablette, name="activer_tablette"),
     path("tablettes/<int:pk>/", views_qr.modifier_tablette, name="modifier_tablette"),

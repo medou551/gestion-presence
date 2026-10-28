@@ -30,7 +30,7 @@
       <p class="erreur" id="erreur" hidden>Connexion perdue — nouvel essai…</p>
     </div>
   </main>
-  <footer>{{ tablette.nom }} · <button type="button" id="plein-ecran" class="petit secondaire">Plein écran</button></footer>
+  <footer>{% if mode_admin %}<a href="{% url 'tableau' %}">← Retour à l'administration</a> · Administrateur : {{ user.get_username }}{% else %}{{ tablette.nom }}{% endif %} · <button type="button" id="plein-ecran" class="petit secondaire">Plein écran</button></footer>
 <script nonce="{{ request.csp_nonce }}">
 (() => {
   const el = id => document.getElementById(id);
@@ -46,8 +46,8 @@
   }
   async function nouveauCode() {
     try {
-      const r = await fetch("{% url 'tablette_code' %}", { cache: "no-store", credentials: "same-origin" });
-      if (r.status === 403) { location.reload(); return; }
+      const r = await fetch("{% if mode_admin %}{% url 'qr_admin_code' %}{% else %}{% url 'tablette_code' %}{% endif %}", { cache: "no-store", credentials: "same-origin" });
+      if (r.status === 403 || r.redirected) { location.reload(); return; }
       const d = await r.json();
       el("qr").innerHTML = d.svg;
       decalage = d.serveur_ms - Date.now();
