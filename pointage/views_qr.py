@@ -96,7 +96,7 @@ def tablette_code(request):
     Tablette.objects.filter(pk=t.pk).update(derniere_activite=timezone.now(), adresse_ip=request.META.get("REMOTE_ADDR"))
     code = signing.dumps({"t": t.pk, "n": secrets.token_hex(4)}, salt=SEL_QR, compress=True)
     url = request.build_absolute_uri(f"/scan/{code}/")
-    svg = segno.make(url, error="m").svg_inline(scale=8, border=2, dark="#111111", light="#ffffff")
+    svg = segno.make(url, error="m").svg_inline(border=2, dark="#111111", light="#ffffff", omitsize=True)
     r = JsonResponse({"ok": True, "svg": svg, "serveur_ms": int(timezone.now().timestamp() * 1000)})
     r["Cache-Control"] = "no-store"
     return r

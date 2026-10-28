@@ -21,7 +21,10 @@ Chaque employé a une photo de référence ; à chaque pointage, son téléphone
 - Visage comparé à la photo de référence ; refus si ce n'est pas la bonne personne, s'il ressemble plus à un collègue,
   si l'image a déjà servi (même fichier, copie de la référence ou d'un ancien pointage), ou en cas de double clic.
 - Heure du serveur uniquement.
-- **Pointage avec son téléphone** (compte Utilisateur) : visage vérifié, uniquement pour soi-même, et seulement
+- **Pointage par QR code** (par défaut) : la tablette du bureau affiche un QR code qui change toutes les 15 s ;
+  l'employé le scanne avec son téléphone, l'heure est enregistrée à la seconde. Sortie avant 8 h : confirmation ;
+  au-delà de 8 h : **heures supplémentaires** (tableau de bord, Mon espace, export Excel).
+- **Pointage avec son téléphone et le visage** (option, `POINTAGE_TELEPHONE=True`) : visage vérifié, uniquement pour soi-même, et seulement
   **à moins de 20 m du lieu de travail** (GPS, rayon réglable dans *Lieux*). Voir GUIDE_UTILISATION.md.
 
 **Rôles**
@@ -106,7 +109,7 @@ ce n'est pas l'application, c'est un réglage mémorisé par ce navigateur sur c
 | `python manage.py configurer_production --adresse IP` | Passe en mode production HTTPS (serveur du bureau) |
 | `python manage.py configurer_pythonanywhere --domaine X` | Configure l'hébergement PythonAnywhere |
 | `python manage.py compacter_base` | Efface définitivement les restes de données supprimées |
-| `python manage.py test pointage` | Lance les 85 tests automatiques |
+| `python manage.py test pointage` | Lance les 94 tests automatiques |
 
 ## Réglages
 
@@ -115,6 +118,8 @@ Dans `.env` (ou `config/settings.py` pour les valeurs par défaut) :
 | Réglage | Défaut | Rôle |
 |---|---|---|
 | `HEURE_ARRIVEE` | `08:00` | Entrée après cette heure = « Retard » |
+| `HEURES_JOURNEE` | `8` | Durée normale ; au-delà = heures supplémentaires |
+| `POINTAGE_TELEPHONE` | `False` | `True` = pointage par téléphone avec le visage |
 | `DUREE_CONSERVATION_PHOTOS_JOURS` | `30` | Durée de conservation des photos de pointage |
 | `SEUIL_RECONNAISSANCE` | `0.5` | Plus petit = plus strict (0,45 à 0,55) |
 | `SAUVEGARDES_A_GARDER` | `14` | Nombre de sauvegardes conservées |
@@ -153,7 +158,7 @@ pointage/
   taches.py            purge des photos, sauvegardes chiffrées
   management/commands  commandes ci-dessus
   static/pointage/     styles, visage.js, face-api.js et modèles
-  tests.py             85 tests (rôles, chiffrement, audit, connexion, pointage…)
+  tests.py             94 tests (rôles, chiffrement, audit, connexion, pointage…)
 deploiement/           scripts Windows : installer, démarrer, arrêter, mettre à jour, Caddy
 installer_local.bat    installation et lancement en double-clic (essai sur un PC)
 DEPLOIEMENT.md         guide de mise en service (dont la base de données)

@@ -74,7 +74,36 @@ La ligne apparaît avec l'étiquette **Manuel**, votre nom et le motif ; l'emplo
 **Supprimer une correction** : lien **Supprimer** sur la ligne « Manuel » du journal.
 Les pointages faits avec le visage ne peuvent être ni modifiés ni supprimés : c'est ce qui garantit leur fiabilité.
 
-## Pointer avec son téléphone
+## Pointer avec le QR code de la tablette (méthode par défaut)
+
+Une tablette au bureau affiche un **QR code qui change toutes les 15 secondes**. Chaque employé le scanne avec
+l'appareil photo de son téléphone : le serveur enregistre l'heure **à la seconde**.
+Premier scan du jour = **entrée**, scan suivant = **sortie**.
+
+**Installer la tablette (une fois, administrateur)**
+1. Sur la tablette, ouvrez `https://alygo.pythonanywhere.com/connexion/` et connectez-vous en administrateur.
+2. Menu **Tablette QR** → donnez un nom (ex. « Tablette entrée ») → **Utiliser cet appareil comme tablette**.
+3. La session administrateur se ferme et le QR code s'affiche. Touchez **Plein écran**, laissez la tablette branchée.
+   (Tablette perdue : menu **Tablette QR** → **Supprimer**, ses QR codes ne marchent plus.)
+
+**Pour chaque employé (une fois)** : créez son accès (Employés → Modifier → **Créer son accès**). Au premier scan,
+il se connecte avec son identifiant ; ensuite il **reste connecté** sur son téléphone (60 jours).
+
+**Tous les jours**
+1. L'employé ouvre l'**appareil photo** de son téléphone, vise le QR code de la tablette et touche le lien.
+2. Le téléphone affiche « Bonjour … — Entrée à 08:01:22 » (ou « Au revoir … — Sortie à … »).
+3. **Sortie avant 8 h de travail** : le téléphone demande de confirmer (« Oui, je sors maintenant »).
+4. **Plus de 8 h** : le temps en plus compte comme **heures supplémentaires** ; il apparaît dans le tableau de bord,
+   dans « Mon espace » de l'employé et dans l'export Excel (onglet « Total par employé »).
+
+Si un **lieu** est défini (menu **Lieux**), le téléphone doit aussi être à moins de 20 m du bureau.
+Le QR code expire au bout de 90 secondes : une photo du QR code envoyée à un collègue absent ne sert à rien.
+La durée normale (8 h) se change dans le fichier `.env` : `HEURES_JOURNEE=8`.
+
+## Pointer avec son téléphone et le visage (option)
+
+Désactivé par défaut. Pour l'activer : ajoutez `POINTAGE_TELEPHONE=True` dans `.env`, puis **Reload**.
+
 
 Chaque employé pointe depuis **son propre téléphone**. Son visage est vérifié, l'heure est celle du serveur, et il ne peut pointer **que pour lui-même** (son compte).
 
