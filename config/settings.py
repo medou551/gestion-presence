@@ -241,6 +241,11 @@ CONNEXION_BLOCAGE_MINUTES = 15             # …le compte et l'adresse sont bloq
 
 # Délai minimum entre deux pointages d'un même employé (évite les doubles clics)
 POINTAGE_DELAI_MIN_SECONDES = 60
+# Pointage depuis le téléphone de l'employé (compte « Employé » + vérification du visage)
+POINTAGE_TELEPHONE = env_bool("POINTAGE_TELEPHONE", True)
+# Réseaux autorisés pour ce pointage, ex. « 41.188.10.25 » (adresse publique du bureau) ou « 192.168.1.0/24 ».
+# Vide = depuis n'importe où (déconseillé : un employé pourrait pointer depuis chez lui).
+POINTAGE_TELEPHONE_RESEAUX = env_liste("POINTAGE_TELEPHONE_RESEAUX", "")
 # Heure normale d'arrivée : au-delà, l'entrée est marquée « en retard »
 HEURE_ARRIVEE = env("HEURE_ARRIVEE", "08:00")
 # Les photos des pointages sont supprimées après ce nombre de jours (les heures sont conservées)

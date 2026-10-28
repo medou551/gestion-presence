@@ -16,6 +16,10 @@ urlpatterns = [
     path("", views.borne, name="borne"),
     path("pointer/", views.pointer, name="pointer"),
 
+    # Pointage depuis le téléphone de l'employé (compte « Employé »)
+    path("pointer-telephone/", views.pointer_telephone, name="pointer_telephone"),
+    path("pointer-telephone/envoyer/", views.pointer_moi, name="pointer_moi"),
+
     # Gestion (Admin, RH, Chef de service)
     path("tableau/", views.tableau, name="tableau"),
     path("export/", views.export_excel, name="export"),
@@ -30,12 +34,14 @@ urlpatterns = [
     path("employes/services/", views_gestion.ajouter_service, name="ajouter_service"),
     path("employes/services/<int:pk>/supprimer/", views_gestion.supprimer_service, name="supprimer_service"),
     path("employes/<int:pk>/", views_gestion.modifier_employe, name="modifier_employe"),
+    path("employes/<int:pk>/acces/", views_gestion.creer_acces_employe, name="creer_acces_employe"),
     path("employes/<int:pk>/effacer-biometrie/", views_gestion.effacer_biometrie, name="effacer_biometrie"),
     path("employes/<int:pk>/supprimer/", views_gestion.supprimer_employe, name="supprimer_employe"),
 
     # Administration (Admin)
     path("comptes/", views_gestion.comptes, name="comptes"),
     path("comptes/<int:pk>/", views_gestion.modifier_compte, name="modifier_compte"),
+    path("lieux/", views_gestion.lieux, name="lieux"),
     path("audit/", views_gestion.audit, name="audit"),
     path("admin/", admin.site.urls),
 

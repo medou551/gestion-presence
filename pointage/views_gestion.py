@@ -15,8 +15,8 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
-from . import visage
-from .models import Employe, JournalAudit, Pointage, Profil, Service
+from . import geo, visage
+from .models import Employe, JournalAudit, Lieu, Pointage, Profil, Service
 from .roles import ADMIN, RH, journaliser, role_de, role_requis
 from .views import _erreur, _verifier_photo
 
@@ -157,8 +157,47 @@ def modifier_employe(request, pk):
                         f"avant: {avant} ; après: {emp.nom} / {emp.poste} / {emp.service} / actif={emp.actif}")
             messages.success(request, f"{emp.nom} : modifications enregistrées.")
             return redirect("employes")
+    compte = getattr(emp, "compte", None)
     return render(request, "pointage/employe_modifier.html", {
-        "emp": emp, "services": Service.objects.all(), "erreurs": erreurs})
+        "emp": emp, "services": Service.objects.all(), "erreurs": erreurs, "compte": compte,
+        "identifiant_propose": "" if compte else _identifiant_propose(emp.nom),
+        "adresse_site": request.build_absolute_uri("/connexion/")})
+
+
+def _identifiant_propose(nom):
+    """« Mohamed Ould Ahmed » → « mohamed.ould.ahmed » (sans accents), rendu unique."""
+    import unicodedata
+    base = unicodedata.normalize("NFKD", nom).encode("ascii", "ignore").decode().lower()
+    base = ".".join("".join(c for c in mot if c.isalnum()) for mot in base.split()).strip(".")[:30] or "employe"
+    identifiant, n = base, 2
+    while User.objects.filter(username__iexact=identifiant).exists():
+        identifiant, n = f"{base}{n}", n + 1
+    return identifiant
+
+
+@require_POST
+@role_requis(ADMIN, RH)
+def creer_acces_employe(request, pk):
+    """Crée le compte « Employé » qui permet de pointer avec son téléphone et de voir son historique."""
+    emp = get_object_or_404(Employe, pk=pk)
+    if getattr(emp, "compte", None):
+        messages.error(request, f"{emp.nom} a déjà un compte : {emp.compte.utilisateur.username}.")
+        return redirect("modifier_employe", pk=emp.pk)
+    identifiant = request.POST.get("identifiant", "").strip()[:150] or _identifiant_propose(emp.nom)
+    if not all(c.isalnum() or c in "._-@+" for c in identifiant):
+        messages.error(request, "Identifiant invalide : lettres, chiffres et . _ - uniquement.")
+        return redirect("modifier_employe", pk=emp.pk)
+    if User.objects.filter(username__iexact=identifiant).exists():
+        messages.error(request, f"L'identifiant « {identifiant} » est déjà utilisé.")
+        return redirect("modifier_employe", pk=emp.pk)
+    mdp = _mdp_temporaire()
+    with transaction.atomic():
+        user = User.objects.create_user(username=identifiant, password=mdp)
+        _appliquer_role(user, Profil.EMPLOYE, None, emp)
+    journaliser(request, "compte_cree", f"compte={identifiant} ; role=employe ; employe={emp.nom} ; depuis la fiche employé")
+    messages.success(request, f"Accès créé pour {emp.nom} — identifiant : {identifiant} — mot de passe temporaire : {mdp}  "
+                              "(notez-le maintenant, il ne sera plus affiché ; l'employé le changera à la première connexion).")
+    return redirect("modifier_employe", pk=emp.pk)
 
 
 @require_POST
@@ -309,6 +348,64 @@ def modifier_compte(request, pk):
     return redirect("comptes")
 
 
+# ---------------------------------------------------------------- Lieux de pointage (téléphone)
+
+@role_requis(ADMIN)
+def lieux(request):
+    """Définir où le pointage par téléphone est autorisé : un point GPS et un rayon (20 m par défaut)."""
+    if request.method == "POST":
+        action = request.POST.get("action", "ajouter")
+        if action == "ajouter":
+            nom = " ".join(request.POST.get("nom", "").split())[:100]
+            position = geo.lire_position(request.POST.get("latitude"), request.POST.get("longitude"),
+                                         request.POST.get("precision"))
+            try:
+                rayon = int(request.POST.get("rayon", "20"))
+            except ValueError:
+                rayon = 0
+            if not nom:
+                messages.error(request, "Donnez un nom au lieu.")
+            elif not position:
+                messages.error(request, "Position manquante : appuyez sur « Utiliser ma position actuelle » "
+                                        "et autorisez la localisation.")
+            elif not 5 <= rayon <= 1000:
+                messages.error(request, "Le rayon doit être compris entre 5 et 1000 mètres.")
+            else:
+                lat, lon, precision = position
+                lieu = Lieu.objects.create(nom=nom, latitude=lat, longitude=lon, rayon_m=rayon)
+                journaliser(request, "lieu_cree", f"lieu={nom} ; rayon={rayon} m ; précision GPS={precision:.0f} m")
+                messages.success(request, f"Lieu « {nom} » enregistré : pointage par téléphone accepté à moins de {rayon} m.")
+                if precision > rayon:
+                    messages.warning(request, f"Attention : la position a été prise avec une précision de {precision:.0f} m. "
+                                              "Pour plus d'exactitude, refaites-la dehors ou près d'une fenêtre, GPS activé.")
+        else:
+            lieu = get_object_or_404(Lieu, pk=request.POST.get("lieu") if str(request.POST.get("lieu", "")).isdigit() else 0)
+            if action == "rayon":
+                try:
+                    rayon = int(request.POST.get("rayon", ""))
+                except ValueError:
+                    rayon = 0
+                if 5 <= rayon <= 1000:
+                    lieu.rayon_m = rayon
+                    lieu.save(update_fields=["rayon_m"])
+                    journaliser(request, "lieu_modifie", f"lieu={lieu.nom} ; rayon={rayon} m")
+                    messages.success(request, f"« {lieu.nom} » : rayon de {rayon} m.")
+                else:
+                    messages.error(request, "Le rayon doit être compris entre 5 et 1000 mètres.")
+            elif action in ("activer", "desactiver"):
+                lieu.actif = action == "activer"
+                lieu.save(update_fields=["actif"])
+                journaliser(request, "lieu_modifie", f"lieu={lieu.nom} ; actif={lieu.actif}")
+                messages.success(request, f"« {lieu.nom} » {'activé' if lieu.actif else 'désactivé'}.")
+            elif action == "supprimer":
+                journaliser(request, "lieu_supprime", f"lieu={lieu.nom}")
+                messages.success(request, f"Lieu « {lieu.nom} » supprimé.")
+                lieu.delete()
+        return redirect("lieux")
+    return render(request, "pointage/lieux.html", {
+        "lieux": Lieu.objects.all(), "precision_max": geo.PRECISION_MAX_M})
+
+
 # ---------------------------------------------------------------- Journal d'audit
 
 LIBELLES_ACTIONS = {
@@ -323,6 +420,7 @@ LIBELLES_ACTIONS = {
     "compte_desactive": "Compte désactivé", "role_modifie": "Rôle modifié", "purge_photos": "Purge des photos",
     "sauvegarde": "Sauvegarde", "sauvegarde_echec": "Sauvegarde échouée", "consultation_audit": "Consultation du journal",
     "service_supprime": "Service supprimé", "compte_supprime": "Compte supprimé",
+    "lieu_cree": "Lieu ajouté", "lieu_modifie": "Lieu modifié", "lieu_supprime": "Lieu supprimé",
     "pointage_manuel_ajoute": "Correction ajoutée", "pointage_manuel_supprime": "Correction supprimée",
 }
 

@@ -1,0 +1,71 @@
+{% extends "pointage/base.html" %}
+{% load static %}
+{% block titre %}Lieux de pointage — Gestion de présence{% endblock %}
+{% block contenu %}
+<h1>Lieux de pointage par téléphone</h1>
+<p class="aide">Les employés ne peuvent pointer avec leur téléphone que s'ils se trouvent dans le cercle d'un lieu actif.
+  Sans aucun lieu actif, le pointage par téléphone fonctionne de partout.
+  Seules la distance et le nom du lieu sont enregistrés avec le pointage, jamais les coordonnées GPS de l'employé.</p>
+
+<div class="borne">
+  <section class="carte">
+    <h2 style="margin-top:0">Ajouter un lieu (sur place)</h2>
+    <p class="aide">Placez-vous <strong>au centre du lieu</strong>, avec votre téléphone, GPS activé,
+      puis appuyez sur « Utiliser ma position actuelle ». Attendez que la précision soit bonne (moins de 10 à 15 m).</p>
+    <form method="post" id="form-lieu" autocomplete="off">{% csrf_token %}
+      <input type="hidden" name="action" value="ajouter">
+      <label class="champ">Nom du lieu<input type="text" name="nom" value="Beitik Soukouk" maxlength="100" required></label>
+      <label class="champ">Rayon autorisé (mètres)<input type="number" name="rayon" value="20" min="5" max="1000" required></label>
+      <input type="hidden" name="latitude" id="latitude">
+      <input type="hidden" name="longitude" id="longitude">
+      <input type="hidden" name="precision" id="precision">
+      <p><button type="button" id="localiser" class="secondaire">📍 Utiliser ma position actuelle</button></p>
+      <div class="etat-position" id="etat" hidden></div>
+      <p><button type="submit" id="enregistrer" disabled>Enregistrer ce lieu</button></p>
+    </form>
+  </section>
+
+  <section class="carte">
+    <h2 style="margin-top:0">Lieux enregistrés</h2>
+    {% for l in lieux %}
+      <div style="padding:10px 0;border-bottom:1px solid #eee">
+        <strong>{{ l.nom }}</strong> {% if l.actif %}<span class="pastille travail">Actif</span>{% else %}<span class="pastille absent">Désactivé</span>{% endif %}
+        <br><small class="aide">Rayon {{ l.rayon_m }} m · {{ l.latitude|floatformat:6 }}, {{ l.longitude|floatformat:6 }} ·
+          <a href="https://www.openstreetmap.org/?mlat={{ l.latitude|stringformat:'f' }}&amp;mlon={{ l.longitude|stringformat:'f' }}#map=19/{{ l.latitude|stringformat:'f' }}/{{ l.longitude|stringformat:'f' }}" target="_blank" rel="noopener noreferrer">voir sur la carte</a></small>
+        <form method="post" class="ligne-form" style="margin-top:6px">{% csrf_token %}
+          <input type="hidden" name="lieu" value="{{ l.id }}">
+          <input type="number" name="rayon" value="{{ l.rayon_m }}" min="5" max="1000" style="width:90px">
+          <button type="submit" name="action" value="rayon" class="petit">Changer le rayon</button>
+          <button type="submit" name="action" value="{% if l.actif %}desactiver{% else %}activer{% endif %}" class="petit secondaire">{% if l.actif %}Désactiver{% else %}Activer{% endif %}</button>
+          <button type="submit" name="action" value="supprimer" class="petit danger confirmer-suppr">Supprimer</button>
+        </form>
+      </div>
+    {% empty %}
+      <p class="vide">Aucun lieu : le pointage par téléphone est possible de partout.</p>
+    {% endfor %}
+  </section>
+</div>
+
+<script src="{% static 'pointage/position.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const el = id => document.getElementById(id), etat = el("etat");
+  const afficher = (t, classe) => { etat.hidden = false; etat.textContent = t; etat.className = "etat-position " + (classe || ""); };
+  el("localiser").addEventListener("click", () => {
+    el("enregistrer").disabled = true;
+    afficher("Recherche de la position GPS… restez immobile.");
+    Position.meilleure(20000, 8, m => afficher("Précision actuelle : " + Math.round(m.precision) + " m… (on attend la meilleure mesure)"))
+      .then(m => {
+        el("latitude").value = m.lat; el("longitude").value = m.lon; el("precision").value = m.precision;
+        const p = Math.round(m.precision);
+        afficher("Position trouvée, précision " + p + " m." + (p > 15 ? " C'est peu précis : réessayez près d'une fenêtre ou dehors si possible." : " Vous pouvez enregistrer."), p > 15 ? "" : "ok");
+        el("enregistrer").disabled = false;
+      })
+      .catch(e => afficher(e.message, "erreur"));
+  });
+  document.querySelectorAll(".confirmer-suppr").forEach(b => b.addEventListener("click", ev => {
+    if (!window.confirm("Supprimer ce lieu ?")) ev.preventDefault();
+  }));
+})();
+</script>
+{% endblock %}

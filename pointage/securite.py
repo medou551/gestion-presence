@@ -55,8 +55,8 @@ class EnTetesSecuriteMiddleware:
             "form-action 'self'",
             "frame-ancestors 'none'",
         ]))
-        # La caméra n'est autorisée que pour ce site ; micro et localisation interdits
-        response.headers.setdefault("Permissions-Policy", "camera=(self), microphone=(), geolocation=(), payment=()")
+        # Caméra et localisation (pointage par téléphone) autorisées pour ce site seulement ; micro interdit
+        response.headers.setdefault("Permissions-Policy", "camera=(self), microphone=(), geolocation=(self), payment=()")
         if request.user.is_authenticated and not request.path.startswith("/static/"):
             response.headers["Cache-Control"] = "no-store, private"
         return response

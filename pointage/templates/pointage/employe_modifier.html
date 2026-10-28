@@ -34,6 +34,20 @@
       </div>
     </div>
 
+    <h3>Pointage avec son téléphone</h3>
+    {% if compte %}
+      <p class="aide">Compte : <strong>{{ compte.utilisateur.username }}</strong>{% if not compte.utilisateur.is_active %} (désactivé){% endif %}.
+        L'employé se connecte sur <strong>{{ adresse_site }}</strong> depuis son téléphone et appuie sur « Pointer ».
+        Mot de passe oublié : <em>Comptes → Réinitialiser</em> (administrateur).</p>
+    {% else %}
+      <p class="aide">Crée un compte « Employé » : il pourra pointer depuis son téléphone (visage vérifié)
+        et consulter ses heures. Un mot de passe temporaire s'affichera une seule fois.</p>
+      <form method="post" action="{% url 'creer_acces_employe' emp.id %}" class="ligne-form">{% csrf_token %}
+        <input type="text" name="identifiant" value="{{ identifiant_propose }}" maxlength="150" autocomplete="off" autocapitalize="none">
+        <button type="submit">Créer son accès</button>
+      </form>
+    {% endif %}
+
     <h3>Départ de l'employé</h3>
     <p class="aide">Supprime la photo de référence, la signature du visage et toutes les photos de pointage, et désactive l'employé.
       Les heures de présence sont conservées (obligations de paie).</p>

@@ -106,7 +106,8 @@ def accueil(request):
     if role == BORNE:
         return redirect(reverse("borne"))
     if role == EMPLOYE:
-        return redirect(reverse("mon_espace"))
+        # Sur téléphone, l'employé arrive directement sur la page de pointage
+        return redirect(reverse("pointer_telephone" if settings.POINTAGE_TELEPHONE else "mon_espace"))
     if role in (ADMIN, RH, CHEF):
         return redirect(reverse("tableau"))
     return redirect(reverse("aucun_role"))

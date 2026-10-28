@@ -88,9 +88,28 @@ class Employe(models.Model):
         return n
 
 
+class Lieu(models.Model):
+    """Lieu de travail : le pointage par téléphone n'est accepté qu'à l'intérieur de ce cercle."""
+    nom = models.CharField(max_length=100)
+    latitude = models.FloatField()
+    longitude = models.FloatField()
+    rayon_m = models.PositiveIntegerField("Rayon (mètres)", default=20)
+    actif = models.BooleanField(default=True)
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nom"]
+        verbose_name = "Lieu de pointage"
+
+    def __str__(self):
+        return self.nom
+
+
 class Pointage(models.Model):
     ENTREE, SORTIE = "E", "S"
     TYPES = [(ENTREE, "Entrée"), (SORTIE, "Sortie")]
+    BORNE, TELEPHONE = "borne", "telephone"
+    SOURCES = [(BORNE, "Borne"), (TELEPHONE, "Téléphone de l'employé")]
 
     employe = models.ForeignKey(Employe, on_delete=models.CASCADE, related_name="pointages")
     type = models.CharField(max_length=1, choices=TYPES)
@@ -110,6 +129,11 @@ class Pointage(models.Model):
     motif = models.CharField("Motif de la correction", max_length=200, blank=True)
     saisi_par = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
                                   related_name="pointages_saisis", verbose_name="Saisi par")
+    # D'où vient le pointage : la borne commune ou le téléphone personnel de l'employé
+    source = models.CharField("Source", max_length=10, choices=SOURCES, default=BORNE)
+    # Téléphone : lieu où l'employé se trouvait et sa distance au centre (les coordonnées GPS ne sont PAS conservées)
+    lieu = models.ForeignKey("Lieu", on_delete=models.SET_NULL, null=True, blank=True, related_name="pointages")
+    distance_lieu_m = models.FloatField(null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ["-horodatage"]
@@ -123,6 +147,10 @@ class Pointage(models.Model):
         if self.manuel:
             par = self.saisi_par.get_username() if self.saisi_par else "?"
             return f"Manuel ({par}) : {self.motif}"
+        if self.source == self.TELEPHONE:
+            if self.lieu_id and self.distance_lieu_m is not None:
+                return f"Téléphone ({self.distance_lieu_m:.0f} m de {self.lieu.nom})"
+            return "Téléphone"
         return "Borne"
 
     @property

@@ -24,9 +24,11 @@
         {% if est_admin %}
           <a href="{% url 'borne' %}">Borne</a>
           <a href="{% url 'comptes' %}">Comptes</a>
+          <a href="{% url 'lieux' %}">Lieux</a>
           <a href="{% url 'audit' %}">Journal</a>
         {% endif %}
         {% if est_employe %}
+          <a href="{% url 'pointer_telephone' %}">Pointer</a>
           <a href="{% url 'mon_espace' %}">Mon espace</a>
         {% endif %}
         <span class="qui" title="{{ role_libelle }}">{{ user.get_username }}{% if role_libelle %} · {{ role_libelle }}{% endif %}</span>

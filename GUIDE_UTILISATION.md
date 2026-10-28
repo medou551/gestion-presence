@@ -73,6 +73,35 @@ La ligne apparaît avec l'étiquette **Manuel**, votre nom et le motif ; l'emplo
 **Supprimer une correction** : lien **Supprimer** sur la ligne « Manuel » du journal.
 Les pointages faits à la borne ne peuvent être ni modifiés ni supprimés : c'est ce qui garantit leur fiabilité.
 
+## Pointer avec son téléphone
+
+Chaque employé peut pointer depuis **son propre téléphone**, sans passer par la borne. Son visage est vérifié comme
+à la borne, l'heure est celle du serveur, et il ne peut pointer **que pour lui-même** (son compte).
+
+**1. Définir le lieu autorisé (une fois, administrateur, sur place)**
+1. Allez **au centre du bureau (Beitik Soukouk)** avec votre téléphone, GPS activé.
+2. Connectez-vous sur `https://alygo.pythonanywhere.com/connexion/` → menu **Lieux**.
+3. Nom : *Beitik Soukouk* ; rayon : **20** m → **📍 Utiliser ma position actuelle** → autorisez la localisation.
+4. Attendez une précision de 10 à 15 m au plus (sinon réessayez près d'une fenêtre) → **Enregistrer ce lieu**.
+
+Dès qu'un lieu est actif, un pointage par téléphone fait **à plus de 20 m est refusé** (et noté dans le Journal).
+Un GPS trop imprécis (plus de 50 m) est aussi refusé. Sans aucun lieu actif, le téléphone peut pointer de partout.
+Le rayon se change dans **Lieux** (si des employés au fond du bâtiment sont refusés, passez à 30 m).
+Seuls le nom du lieu et la distance sont conservés, jamais les coordonnées GPS des employés.
+
+**2. Donner l'accès à un employé (Admin ou RH)**
+**Employés** → **Modifier** → section *Pointage avec son téléphone* → **Créer son accès**.
+Notez l'identifiant et le mot de passe temporaire affichés et donnez-les à l'employé.
+(L'employé doit avoir une photo de référence.)
+
+**3. Côté employé**
+1. Sur son téléphone (Chrome sur Android, Safari sur iPhone) : `https://alygo.pythonanywhere.com/connexion/`.
+2. Première fois : il choisit son propre mot de passe. Astuce : *Ajouter à l'écran d'accueil* pour une icône.
+3. Il autorise **la caméra** et **la position**, vérifie le message vert « Vous êtes à X m de Beitik Soukouk »,
+   puis appuie sur **Pointer**. L'entrée et la sortie alternent automatiquement.
+
+Dans le tableau de bord, ces pointages portent l'étiquette **📱 Téléphone** avec la distance au lieu.
+
 ## Mot de passe oublié
 
 - **Un utilisateur** : l'administrateur va dans **Comptes → Gérer → Nouveau mot de passe**.

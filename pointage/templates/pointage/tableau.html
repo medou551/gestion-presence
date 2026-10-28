@@ -58,7 +58,7 @@
 <div class="carte tableau-defile">
   {% if journal %}
   <table>
-    <thead><tr><th>Heure</th><th>Nom</th><th>Type</th><th>Référence / pointage</th><th>Ressemblance</th><th>Borne (IP)</th></tr></thead>
+    <thead><tr><th>Heure</th><th>Nom</th><th>Type</th><th>Référence / pointage</th><th>Ressemblance</th><th>Source (IP)</th></tr></thead>
     <tbody>
     {% for p in journal %}
       <tr>
@@ -79,7 +79,7 @@
         <td>{% if p.employe.photo_reference %}<img class="photo-mini" src="{% url 'photo_reference' p.employe.id %}" alt="Référence" loading="lazy">{% endif %}{% if p.photo %}<img class="photo-mini" src="{% url 'photo_pointage' p.id %}" alt="Photo de {{ p.employe.nom }}" loading="lazy">{% else %}<span class="aide">photo supprimée</span>{% endif %}</td>
         <td class="num">{% if p.ressemblance is not None %}{{ p.ressemblance }} %{% else %}—{% endif %}</td>
         {% endif %}
-        <td>{{ p.adresse_ip|default:"—" }}</td>
+        <td>{% if p.source == "telephone" %}<span class="pastille telephone">📱 Téléphone</span><br>{% if p.lieu %}<small>{{ p.distance_lieu_m|floatformat:0 }} m de {{ p.lieu.nom }}</small><br>{% endif %}{% elif not p.manuel %}Borne<br>{% endif %}<small class="aide">{{ p.adresse_ip|default:"—" }}</small></td>
       </tr>
     {% endfor %}
     </tbody>

@@ -163,3 +163,15 @@ table.diagnostic td.etat.ok { color: var(--vert); }
 table.diagnostic td.etat.ko { color: var(--rouge); }
 table.diagnostic td.etat.info { color: var(--doux); }
 table.diagnostic .aide { margin-top: 3px; font-size: 12px; word-break: break-word; }
+
+/* Pointage depuis le téléphone de l'employé */
+.pastille.telephone { background: var(--bleu-clair); color: var(--bleu); }
+.telephone-pointage { max-width: 480px; margin: 0 auto; }
+.telephone-pointage .horloge .heure { font-size: 48px; }
+.telephone-pointage .camera { aspect-ratio: 3 / 4; }
+.telephone-pointage .prochain { text-align: center; font-size: 18px; margin: 12px 0; }
+.telephone-pointage .gros { padding: 20px; font-size: 22px; }
+.note.warning { background: var(--orange-clair); color: var(--orange); }
+.etat-position { margin: 10px 0; padding: 10px 12px; border-radius: 8px; background: var(--bleu-clair); color: var(--bleu); font-weight: 600; }
+.etat-position.ok { background: var(--vert-clair); color: var(--vert); }
+.etat-position.erreur { background: var(--rouge-clair); color: var(--rouge); }

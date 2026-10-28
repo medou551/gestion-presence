@@ -22,6 +22,8 @@ Chaque employé a une photo de référence ; à chaque pointage, la borne prend 
 - Visage comparé à la photo de référence ; refus si ce n'est pas la bonne personne, s'il ressemble plus à un collègue,
   si l'image a déjà servi (même fichier, copie de la référence ou d'un ancien pointage), ou en cas de double clic.
 - Heure du serveur uniquement.
+- **Pointage avec son téléphone** (compte Employé) : visage vérifié, uniquement pour soi-même, et seulement
+  **à moins de 20 m du lieu de travail** (GPS, rayon réglable dans *Lieux*). Voir GUIDE_UTILISATION.md.
 
 **Rôles**
 | Rôle | Accès |
@@ -30,7 +32,7 @@ Chaque employé a une photo de référence ; à chaque pointage, la borne prend 
 | Ressources humaines | Employés et photos de référence, tableau et exports de tous les services |
 | Chef de service | Tableau et exports de **son service** uniquement |
 | Borne de pointage | Uniquement la page de pointage |
-| Employé | Son historique, ses heures, téléchargement de ses données |
+| Employé | Pointer avec son téléphone (sur le lieu de travail), son historique, ses données |
 
 **Sécurité et confidentialité**
 - Photos (référence et pointages), signatures du visage et sauvegardes **chiffrées** ; photos jamais servies directement.
@@ -106,7 +108,7 @@ ce n'est pas l'application, c'est un réglage mémorisé par ce navigateur sur c
 | `python manage.py configurer_production --adresse IP` | Passe en mode production HTTPS (serveur du bureau) |
 | `python manage.py configurer_pythonanywhere --domaine X` | Configure l'hébergement PythonAnywhere |
 | `python manage.py compacter_base` | Efface définitivement les restes de données supprimées |
-| `python manage.py test pointage` | Lance les 68 tests automatiques |
+| `python manage.py test pointage` | Lance les 85 tests automatiques |
 
 ## Réglages
 
@@ -153,7 +155,7 @@ pointage/
   taches.py            purge des photos, sauvegardes chiffrées
   management/commands  commandes ci-dessus
   static/pointage/     styles, visage.js, face-api.js et modèles
-  tests.py             68 tests (rôles, chiffrement, audit, connexion, pointage…)
+  tests.py             85 tests (rôles, chiffrement, audit, connexion, pointage…)
 deploiement/           scripts Windows : installer, démarrer, arrêter, mettre à jour, Caddy
 installer_local.bat    installation et lancement en double-clic (essai sur un PC)
 DEPLOIEMENT.md         guide de mise en service (dont la base de données)

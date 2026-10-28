@@ -1,3 +1,4 @@
+import ipaddress
 from datetime import datetime, time, timedelta
 from io import BytesIO
 
@@ -7,8 +8,8 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from . import taches, visage
-from .models import Employe, Pointage, Service, resume_journee
+from . import geo, taches, visage
+from .models import Employe, Lieu, Pointage, Service, resume_journee
 from .roles import (ADMIN, BORNE, CHEF, EMPLOYE, GESTION, RH, employe_du_compte, employes_visibles,
                     journaliser, pointages_visibles, role_de, role_requis, service_du_chef)
 
@@ -81,12 +82,104 @@ def _refus(request, emp, message, status, raison):
 @require_POST
 @role_requis(BORNE, ADMIN)
 def pointer(request):
+    """Pointage depuis la borne commune : l'employé choisit son nom, puis son visage est vérifié."""
     employe_id = request.POST.get("employe", "").strip()
-    pin = request.POST.get("pin", "").strip()
-    photo = request.FILES.get("photo")
-
     if not employe_id.isdigit():
         return _erreur("Choisissez votre nom dans la liste.")
+    emp = Employe.objects.filter(pk=int(employe_id), actif=True).first()
+    return _enregistrer_pointage(request, emp, Pointage.BORNE, verifier_pin=True)
+
+
+def _reseau_autorise(request):
+    """Vrai si l'adresse du téléphone fait partie des réseaux autorisés (ou si aucune restriction n'est définie)."""
+    reseaux = settings.POINTAGE_TELEPHONE_RESEAUX
+    if not reseaux:
+        return True
+    try:
+        ip = ipaddress.ip_address(request.META.get("REMOTE_ADDR", ""))
+    except ValueError:
+        return False
+    for r in reseaux:
+        try:
+            if ip in ipaddress.ip_network(r, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def _pointage_telephone_possible(request):
+    """Retourne (employé, message d'erreur)."""
+    if not settings.POINTAGE_TELEPHONE:
+        return None, "Le pointage par téléphone est désactivé. Utilisez la borne."
+    emp = employe_du_compte(request.user)
+    if not emp or not emp.actif:
+        return None, "Ce compte n'est relié à aucun employé actif. Voyez les RH."
+    if not _reseau_autorise(request):
+        return emp, "Pointage refusé : connectez-vous au Wi-Fi du bureau pour pointer avec votre téléphone."
+    return emp, None
+
+
+@role_requis(EMPLOYE)
+def pointer_telephone(request):
+    """Page de pointage sur le téléphone de l'employé (son propre compte : pas de choix du nom)."""
+    emp, probleme = _pointage_telephone_possible(request)
+    dernier = emp.dernier_pointage() if emp else None
+    aujourdhui = timezone.localdate()
+    if dernier and timezone.localtime(dernier.horodatage).date() == aujourdhui and dernier.type == Pointage.ENTREE:
+        prochain = "Sortie"
+    else:
+        prochain = "Entrée"
+    return render(request, "pointage/pointer_telephone.html", {
+        "employe": emp, "probleme": probleme, "prochain": prochain,
+        "lieux": [{"nom": l.nom, "lat": l.latitude, "lon": l.longitude, "rayon": l.rayon_m}
+                  for l in Lieu.objects.filter(actif=True)],
+        "precision_max": geo.PRECISION_MAX_M,
+        "dernier": dernier if dernier and timezone.localtime(dernier.horodatage).date() == aujourdhui else None,
+        "serveur_ms": int(timezone.now().timestamp() * 1000), "fuseau": settings.TIME_ZONE,
+    })
+
+
+@require_POST
+@role_requis(EMPLOYE)
+def pointer_moi(request):
+    """Pointage envoyé par le téléphone : l'employé est celui du compte connecté, jamais un autre."""
+    emp, probleme = _pointage_telephone_possible(request)
+    if probleme:
+        if emp:
+            journaliser(request, "pointage_refuse", f"employe={emp.nom} ; raison=téléphone hors du réseau autorisé")
+        return _erreur(probleme, 403)
+    lieu, distance_lieu, probleme = _verifier_position(request)
+    if probleme:
+        return _refus(request, emp, probleme, 403, f"position : {probleme}")
+    return _enregistrer_pointage(request, emp, Pointage.TELEPHONE, verifier_pin=False,
+                                 lieu=lieu, distance_lieu_m=distance_lieu)
+
+
+def _verifier_position(request):
+    """Si des lieux sont définis, le téléphone doit être à l'intérieur de l'un d'eux.
+    Retourne (lieu, distance en m, message d'erreur)."""
+    lieux = list(Lieu.objects.filter(actif=True))
+    if not lieux:
+        return None, None, None
+    position = geo.lire_position(request.POST.get("latitude"), request.POST.get("longitude"),
+                                 request.POST.get("precision"))
+    if not position:
+        return None, None, "Position introuvable : autorisez la localisation pour ce site et activez le GPS."
+    lat, lon, precision = position
+    if precision > geo.PRECISION_MAX_M:
+        return None, None, (f"Position trop imprécise ({precision:.0f} m). Activez le GPS (localisation précise), "
+                            "approchez-vous d'une fenêtre puis réessayez.")
+    lieu, d = geo.lieu_le_plus_proche(lat, lon, lieux)
+    if d > lieu.rayon_m:
+        return None, None, (f"Vous êtes à {d:.0f} m de {lieu.nom}. Le pointage par téléphone n'est possible "
+                            f"qu'à moins de {lieu.rayon_m} m.")
+    return lieu, round(d, 1), None
+
+
+def _enregistrer_pointage(request, emp, source, verifier_pin, **champs):
+    """Contrôles communs à la borne et au téléphone, puis enregistrement à l'heure du serveur."""
+    photo = request.FILES.get("photo")
     probleme = _verifier_photo(photo)
     if probleme:
         return _erreur(probleme)
@@ -94,26 +187,25 @@ def pointer(request):
     if descripteur is None:
         return _erreur("Aucun visage détecté. Placez-vous bien face à la caméra.")
 
-    emp = Employe.objects.filter(pk=int(employe_id), actif=True).first()
     if not emp:
         return _erreur("Employé introuvable.", 404)
     if not emp.a_reference:
         return _erreur(f"{emp.nom} n'a pas encore de photo de référence. Voyez le responsable.", 409)
-    if emp.demande_pin and not emp.verifier_pin(pin):
+    if verifier_pin and emp.demande_pin and not emp.verifier_pin(request.POST.get("pin", "").strip()):
         return _refus(request, emp, "Code PIN incorrect.", 403, "PIN incorrect")
 
-    # 1) Le visage doit être celui de l'employé choisi
+    # 1) Le visage doit être celui de l'employé
     dist = visage.distance(descripteur, emp.descripteur)
     if dist > visage.seuil():
         return _refus(request, emp, f"Visage non reconnu : il ne correspond pas à la photo de référence de {emp.nom}.",
-                      403, f"visage différent (distance {dist:.2f})")
+                      403, f"visage différent (distance {dist:.2f}) ; source={source}")
 
     # 2) ...et ne doit pas ressembler davantage à un autre employé (pas de pointage pour un collègue)
     autres = Employe.objects.filter(actif=True).exclude(pk=emp.pk).exclude(descripteur_chiffre="")
     autre, dist_autre = visage.plus_proche(descripteur, autres)
     if autre and dist_autre < dist and dist_autre <= visage.seuil():
         return _refus(request, emp, "Visage refusé : il ressemble davantage à un autre employé.", 403,
-                      f"ressemble davantage à {autre.nom}")
+                      f"ressemble davantage à {autre.nom} ; source={source}")
 
     # 3) Pas de double pointage rapproché
     maintenant = timezone.now()
@@ -139,8 +231,8 @@ def pointer(request):
     meme_jour = dernier and timezone.localtime(dernier.horodatage).date() == timezone.localtime(maintenant).date()
     type_ = Pointage.SORTIE if (meme_jour and dernier.type == Pointage.ENTREE) else Pointage.ENTREE
 
-    p = Pointage(employe=emp, type=type_, horodatage=maintenant, empreinte=empreinte,
-                 distance=round(dist, 4), adresse_ip=request.META.get("REMOTE_ADDR"))
+    p = Pointage(employe=emp, type=type_, horodatage=maintenant, empreinte=empreinte, source=source,
+                 distance=round(dist, 4), adresse_ip=request.META.get("REMOTE_ADDR"), **champs)
     p.descripteur = descripteur
     p.photo.save("pointage.jpg", photo, save=False)
     p.save()
@@ -204,7 +296,7 @@ def tableau(request):
     lignes = _lignes_du_jour(jour, employes)
     debut, fin = _bornes_jour(jour)
     journal = (pointages_visibles(request.user).filter(employe__in=employes, horodatage__range=(debut, fin))
-               .select_related("employe", "saisi_par"))
+               .select_related("employe", "saisi_par", "lieu"))
     stats = {
         "presents": sum(1 for l in lignes if l["statut"] != "Absent"),
         "absents": sum(1 for l in lignes if l["statut"] == "Absent"),
@@ -352,6 +444,7 @@ def mon_espace(request):
         "retards": sum(1 for j in jours if j["retard"]), "debut": debut,
         "precedent": precedent, "suivant": fin if fin <= aujourdhui else None,
         "conservation": settings.DUREE_CONSERVATION_PHOTOS_JOURS,
+        "pointage_telephone": settings.POINTAGE_TELEPHONE,
     })
 
 

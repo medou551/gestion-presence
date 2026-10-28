@@ -739,3 +739,139 @@ class VisageTests(TestCase):
         self.assertEqual(visage.distance(ALI, ALI), 0)
         self.assertLess(visage.distance(ALI, variante(ALI)), 0.5)
         self.assertGreater(visage.distance(ALI, FATOU), 0.5)
+
+
+# =========================================================================== Pointage par téléphone
+
+class TelephoneTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.u_ali = self.connecter(Profil.EMPLOYE, employe=self.ali)
+
+    def envoyer(self, sig, **extra):
+        return self.client.post("/pointer-telephone/envoyer/", {
+            "descripteur": json.dumps(sig), "photo": photo(), **extra}, **getattr(self, "meta", {}))
+
+    def test_page_et_redirection_apres_connexion(self):
+        self.assertEqual(self.client.get("/pointer-telephone/").status_code, 200)
+        self.assertRedirects(self.client.get("/accueil/"), "/pointer-telephone/")
+
+    def test_pointage_par_telephone_accepte(self):
+        r = self.envoyer(variante(ALI))
+        self.assertEqual(r.status_code, 200, r.content)
+        p = Pointage.objects.get()
+        self.assertEqual((p.employe, p.source, p.origine), (self.ali, Pointage.TELEPHONE, "Téléphone"))
+
+    def test_impossible_de_pointer_pour_un_autre(self):
+        # Le champ « employe » est ignoré : c'est toujours l'employé du compte connecté
+        r = self.envoyer(variante(OUMAR), employe=self.oumar.id)
+        self.assertEqual(r.status_code, 403)
+        self.assertFalse(Pointage.objects.exists())
+
+    def test_visage_inconnu_refuse(self):
+        self.assertEqual(self.envoyer(signature(77)).status_code, 403)
+
+    def test_reservee_au_role_employe(self):
+        for role in (Profil.BORNE, Profil.RH, Profil.CHEF):
+            self.client.logout()
+            self.connecter(role, service=self.compta if role == Profil.CHEF else None)
+            self.assertEqual(self.envoyer(variante(ALI)).status_code, 403, role)
+
+    @override_settings(POINTAGE_TELEPHONE_RESEAUX=["41.188.10.0/24"])
+    def test_restriction_au_wifi_du_bureau(self):
+        self.meta = {"REMOTE_ADDR": "102.2.3.4"}
+        r = self.envoyer(variante(ALI, graine=1))
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("Wi-Fi", r.json()["message"])
+        self.meta = {"REMOTE_ADDR": "41.188.10.25"}
+        self.assertEqual(self.envoyer(variante(ALI, graine=2)).status_code, 200)
+
+    @override_settings(POINTAGE_TELEPHONE=False)
+    def test_desactivable(self):
+        self.assertEqual(self.envoyer(variante(ALI)).status_code, 403)
+        self.assertRedirects(self.client.get("/accueil/"), "/mon-espace/")
+
+    def test_rh_cree_l_acces_depuis_la_fiche(self):
+        self.client.logout()
+        self.connecter(Profil.RH)
+        r = self.client.post(f"/employes/{self.oumar.id}/acces/", {"identifiant": ""}, follow=True)
+        self.assertContains(r, "oumar.diallo")
+        profil = Profil.objects.get(employe=self.oumar)
+        self.assertEqual(profil.role, Profil.EMPLOYE)
+        self.assertTrue(profil.doit_changer_mdp)
+        # Pas de second compte pour le même employé
+        self.client.post(f"/employes/{self.oumar.id}/acces/", {"identifiant": "autre"})
+        self.assertFalse(User.objects.filter(username="autre").exists())
+
+
+# =========================================================================== Lieu de pointage (GPS)
+
+from .geo import distance_m  # noqa: E402
+from .models import Lieu  # noqa: E402
+
+BUREAU = (18.0860, -15.9750)  # point de test (Nouakchott)
+
+
+def decale(lat, lon, metres_nord):
+    return lat + metres_nord / 111_195, lon
+
+
+class LieuTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.connecter(Profil.EMPLOYE, employe=self.ali)
+        self.lieu = Lieu.objects.create(nom="Beitik Soukouk", latitude=BUREAU[0], longitude=BUREAU[1], rayon_m=20)
+
+    def envoyer(self, sig, position=None, precision=8):
+        donnees = {"descripteur": json.dumps(sig), "photo": photo()}
+        if position:
+            donnees.update(latitude=position[0], longitude=position[1], precision=precision)
+        return self.client.post("/pointer-telephone/envoyer/", donnees)
+
+    def test_distance(self):
+        self.assertAlmostEqual(distance_m(*BUREAU, *decale(*BUREAU, 15)), 15, delta=0.2)
+
+    def test_a_moins_de_20_m_accepte(self):
+        r = self.envoyer(variante(ALI), decale(*BUREAU, 12))
+        self.assertEqual(r.status_code, 200, r.content)
+        p = Pointage.objects.get()
+        self.assertEqual(p.lieu, self.lieu)
+        self.assertAlmostEqual(p.distance_lieu_m, 12, delta=0.5)
+        self.assertIn("Beitik Soukouk", p.origine)
+
+    def test_au_dela_de_20_m_refuse(self):
+        r = self.envoyer(variante(ALI), decale(*BUREAU, 35))
+        self.assertEqual(r.status_code, 403)
+        self.assertIn("35 m", r.json()["message"])
+        self.assertFalse(Pointage.objects.exists())
+        self.assertTrue(JournalAudit.objects.filter(action="pointage_refuse", details__contains="position").exists())
+
+    def test_sans_position_refuse(self):
+        self.assertEqual(self.envoyer(variante(ALI)).status_code, 403)
+
+    def test_position_imprecise_refusee(self):
+        self.assertEqual(self.envoyer(variante(ALI), BUREAU, precision=200).status_code, 403)
+
+    def test_lieu_desactive_plus_de_restriction(self):
+        self.lieu.actif = False
+        self.lieu.save()
+        self.assertEqual(self.envoyer(variante(ALI)).status_code, 200)
+
+    def test_la_borne_n_est_pas_concernee(self):
+        self.client.logout()
+        self.connecter(Profil.BORNE)
+        self.assertEqual(self.pointer(self.ali, variante(ALI)).status_code, 200)
+
+    def test_admin_enregistre_le_lieu(self):
+        self.client.logout()
+        self.connecter(Profil.ADMIN)
+        r = self.client.post("/lieux/", {"action": "ajouter", "nom": "Annexe", "rayon": "20",
+                                         "latitude": "18.1", "longitude": "-15.96", "precision": "6"}, follow=True)
+        self.assertContains(r, "moins de 20 m")
+        self.assertTrue(Lieu.objects.filter(nom="Annexe", rayon_m=20).exists())
+        # Sans position : refusé
+        self.client.post("/lieux/", {"action": "ajouter", "nom": "Sans GPS", "rayon": "20"})
+        self.assertFalse(Lieu.objects.filter(nom="Sans GPS").exists())
+
+    def test_lieux_reserve_a_l_admin(self):
+        self.assertEqual(self.client.get("/lieux/").status_code, 403)

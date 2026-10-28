@@ -1,0 +1,147 @@
+{% extends "pointage/base.html" %}
+{% load static %}
+{% block titre %}Pointer — Gestion de présence{% endblock %}
+{% block contenu %}
+<div class="telephone-pointage">
+  <div class="horloge">
+    <div class="heure" id="heure">--:--:--</div>
+    <div class="date" id="date"></div>
+  </div>
+
+  {% if not employe %}
+    <div class="carte"><p class="erreurs">{{ probleme }}</p></div>
+  {% else %}
+  <section class="carte">
+    <h1 style="margin:0 0 4px;font-size:20px">{{ employe.nom }}</h1>
+    {% if dernier %}<p class="aide" style="margin:0">Dernier pointage aujourd'hui : {{ dernier.get_type_display }} à {{ dernier.horodatage|time:"H:i:s" }}</p>{% endif %}
+
+    {% if probleme %}
+      <p class="alerte">{{ probleme }}</p>
+    {% elif not employe.a_reference %}
+      <p class="alerte">Vous n'avez pas encore de photo de référence. Demandez aux RH de l'enregistrer.</p>
+    {% else %}
+    <div class="camera" style="margin-top:12px">
+      <video id="video" autoplay playsinline muted></video>
+      <img id="figee" alt="Photo prise" hidden>
+      <div class="cadre-visage" aria-hidden="true"></div>
+      <div class="aucune" id="pas-camera" hidden><div><strong>Caméra indisponible</strong><p id="pas-camera-detail"></p>
+        <button type="button" id="reessayer-camera" class="petit">Réessayer</button> <a href="{% url 'diagnostic' %}" class="lien-clair">Diagnostic</a></div></div>
+    </div>
+    <div class="etat-ia" id="etat-ia">Chargement de la reconnaissance faciale…</div>
+    {% if lieux %}<div class="etat-position" id="etat-position">Recherche de votre position…</div>{% endif %}
+    <p class="prochain">Prochain pointage : <strong id="prochain">{{ prochain }}</strong></p>
+    <button class="gros" id="pointer" disabled>Pointer ({{ prochain|lower }})</button>
+    <div class="message" id="message"></div>
+    <p class="aide">Tenez le téléphone face à vous, visage bien éclairé. L'heure enregistrée est celle du serveur,
+      pas celle du téléphone. Une photo est prise à chaque pointage et vérifiée avec votre photo de référence.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+  <p style="text-align:center"><a href="{% url 'mon_espace' %}">Voir mon historique →</a></p>
+</div>
+
+{% if employe and not probleme and employe.a_reference %}
+<script src="{% static 'pointage/faceapi/face-api.js' %}"></script>
+<script src="{% static 'pointage/visage.js' %}"></script>
+<script src="{% static 'pointage/position.js' %}"></script>
+{% endif %}
+{{ lieux|json_script:"donnees-lieux" }}
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const el = id => document.getElementById(id);
+  const fuseau = "{{ fuseau }}";
+  const decalage = {{ serveur_ms }} - Date.now();  // on affiche l'heure du SERVEUR, pas celle du téléphone
+  const fmtHeure = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: fuseau });
+  const fmtDate = new Intl.DateTimeFormat("fr-FR", { weekday: "long", day: "numeric", month: "long", timeZone: fuseau });
+  const tic = () => { const d = new Date(Date.now() + decalage); el("heure").textContent = fmtHeure.format(d); el("date").textContent = fmtDate.format(d); };
+  tic(); setInterval(tic, 250);
+
+  const bouton = el("pointer");
+  if (!bouton || typeof Visage === "undefined") return;
+  const video = el("video"), figee = el("figee");
+  const csrf = "{{ csrf_token }}";
+  const lieux = JSON.parse(el("donnees-lieux").textContent), PRECISION_MAX = {{ precision_max }};
+  let iaPrete = false, occupe = false, termine = false;
+
+  // ---------- Position (seulement si des lieux de pointage sont définis) ----------
+  function situer(m) {
+    let proche = null, d = Infinity;
+    lieux.forEach(l => { const x = Position.distanceM(m.lat, m.lon, l.lat, l.lon); if (x < d) { d = x; proche = l; } });
+    return { lieu: proche, distance: d };
+  }
+  function afficherPosition(m) {
+    const e = el("etat-position"); if (!e) return;
+    const s = situer(m), dans = s.distance <= s.lieu.rayon, precis = m.precision <= PRECISION_MAX;
+    e.textContent = (dans ? "✔ Vous êtes à " : "✖ Vous êtes à ") + Math.round(s.distance) + " m de " + s.lieu.nom
+      + " (autorisé : moins de " + s.lieu.rayon + " m) · précision GPS " + Math.round(m.precision) + " m"
+      + (precis ? "" : " — trop imprécis, activez le GPS");
+    e.className = "etat-position " + (dans && precis ? "ok" : "erreur");
+  }
+  if (lieux.length) {
+    Position.meilleure(15000, 10, afficherPosition).then(afficherPosition)
+      .catch(e => { const x = el("etat-position"); x.textContent = e.message; x.className = "etat-position erreur"; });
+  }
+  const majBouton = () => { bouton.disabled = !(video.srcObject && iaPrete && !occupe && !termine); };
+  const afficherMessage = (t, ok) => { const m = el("message"); m.textContent = t; m.className = "message " + (ok ? "ok" : "erreur"); };
+
+  Visage.charger("{% static 'pointage/faceapi/modeles' %}")
+    .then(() => { iaPrete = true; el("etat-ia").textContent = "Reconnaissance faciale prête (" + Visage.libelleMoteur() + ")"; el("etat-ia").classList.add("pret"); majBouton(); })
+    .catch(e => { el("etat-ia").textContent = (e && e.message) || "Impossible de charger la reconnaissance faciale. Rechargez la page."; el("etat-ia").classList.add("erreur"); });
+
+  function demarrerCamera() {
+    el("pas-camera").hidden = true;
+    Visage.ouvrirCamera(video).then(majBouton)
+      .catch(e => { el("pas-camera-detail").textContent = e.message; el("pas-camera").hidden = false; majBouton(); });
+  }
+  el("reessayer-camera").addEventListener("click", demarrerCamera);
+  demarrerCamera();
+
+  bouton.addEventListener("click", async () => {
+    if (bouton.disabled) return;
+    occupe = true; majBouton(); bouton.textContent = "Analyse du visage… ne bougez pas";
+    let reussi = false;
+    try {
+      let position = null;
+      if (lieux.length) {
+        bouton.textContent = "Localisation…";
+        try { position = await Position.meilleure(12000, 10, afficherPosition); afficherPosition(position); }
+        catch (e) { afficherMessage(e.message, false); return; }
+        bouton.textContent = "Analyse du visage… ne bougez pas";
+      }
+      const canvas = Visage.capturer(video);
+      figee.src = canvas.toDataURL("image/jpeg", 0.9); figee.hidden = false; video.hidden = true;
+      const analyse = await Visage.analyser(canvas);
+      if (!analyse.ok) { afficherMessage(analyse.message, false); return; }
+      bouton.textContent = "Vérification…";
+      const f = new FormData();
+      f.append("descripteur", JSON.stringify(analyse.descripteur));
+      f.append("photo", await Visage.enJpeg(canvas), "pointage.jpg");
+      if (position) { f.append("latitude", position.lat); f.append("longitude", position.lon); f.append("precision", position.precision); }
+      const r = await fetch("{% url 'pointer_moi' %}", { method: "POST", body: f, headers: { "X-CSRFToken": csrf }, credentials: "same-origin" });
+      if (r.redirected || !(r.headers.get("content-type") || "").includes("json")) {
+        afficherMessage("Session expirée : reconnectez-vous puis pointez à nouveau.", false);
+        setTimeout(() => location.reload(), 2500);
+        return;
+      }
+      const d = await r.json();
+      afficherMessage(d.message, d.ok);
+      reussi = d.ok;
+    } catch (e) {
+      afficherMessage("Erreur de connexion au serveur. Vérifiez votre connexion Internet.", false);
+    } finally {
+      occupe = false;
+      if (reussi) {
+        termine = true; bouton.textContent = "Pointage enregistré ✔";
+        // On coupe la caméra : inutile de la laisser allumée sur le téléphone
+        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+        setTimeout(() => location.reload(), 5000);
+      } else {
+        figee.hidden = true; video.hidden = false;
+        bouton.textContent = "Réessayer";
+      }
+      majBouton();
+    }
+  });
+})();
+</script>
+{% endblock %}
