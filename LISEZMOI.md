@@ -22,8 +22,8 @@ Chaque employé a une photo de référence ; à chaque pointage, son téléphone
   si l'image a déjà servi (même fichier, copie de la référence ou d'un ancien pointage), ou en cas de double clic.
 - Heure du serveur uniquement.
 - **Pointage par QR code** (par défaut) : la tablette du bureau affiche un QR code qui change toutes les 15 s ;
-  l'employé le scanne avec son téléphone, l'heure est enregistrée à la seconde. Sortie avant 8 h : confirmation ;
-  au-delà de 8 h : **heures supplémentaires** (tableau de bord, Mon espace, export Excel).
+  l'employé le scanne avec son téléphone, l'heure est enregistrée à la seconde. **Deux scans par jour** : entrée,
+  puis sortie **seulement après 8 h 00 min** de travail ; au-delà de 8 h : **heures supplémentaires** (tableau de bord, Mon espace, export Excel).
 - **Pointage avec son téléphone et le visage** (option, `POINTAGE_TELEPHONE=True`) : visage vérifié, uniquement pour soi-même, et seulement
   **à moins de 20 m du lieu de travail** (GPS, rayon réglable dans *Lieux*). Voir GUIDE_UTILISATION.md.
 

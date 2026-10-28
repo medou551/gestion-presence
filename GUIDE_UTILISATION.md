@@ -98,7 +98,10 @@ il se connecte avec son identifiant ; ensuite il **reste connecté** sur son té
    (menu **Scanner**). Il vise le QR code affiché au bureau : il est lu tout seul.
    (Il peut aussi utiliser l'appareil photo du téléphone et toucher le lien qui apparaît.)
 2. Le téléphone affiche « Bonjour … — Entrée à 08:01:22 » (ou « Au revoir … — Sortie à … »).
-3. **Sortie avant 8 h de travail** : le téléphone demande de confirmer (« Oui, je sors maintenant »).
+3. **Deux scans par jour seulement** : l'**entrée**, puis la **sortie**, qui n'est acceptée qu'**après 8 h 00 min**
+   de travail (le téléphone affiche l'heure à partir de laquelle la sortie est possible). Un 3e scan est refusé.
+   Départ avant 8 h (maladie, autorisation) : l'administrateur ajoute la sortie avec **Corriger un oubli**
+   (tableau de bord), avec le motif.
 4. **Plus de 8 h** : le temps en plus compte comme **heures supplémentaires** ; il apparaît dans le tableau de bord,
    dans « Mon espace » de l'employé et dans l'export Excel (onglet « Total par employé »).
 
