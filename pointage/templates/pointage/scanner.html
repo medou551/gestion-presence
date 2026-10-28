@@ -5,7 +5,23 @@
 <div class="telephone-pointage">
   <section class="carte">
     <h1 style="margin:0 0 4px;font-size:20px">{{ employe.nom|default:"" }}</h1>
-    <p class="aide" style="margin:0">{% if dernier %}Dernier pointage aujourd'hui : {{ dernier.get_type_display }} à {{ dernier.horodatage|time:"H:i:s" }} · {% endif %}Prochain : <strong>{{ prochain }}</strong></p>
+    <ol class="deux-scans">
+      <li class="{% if etat.entree %}fait{% else %}actuel{% endif %}"><strong>Entrée</strong>
+        {% if etat.entree %}<span>✔ {{ etat.entree.horodatage|time:"H:i:s" }}</span>{% else %}<span>à scanner maintenant</span>{% endif %}</li>
+      <li class="{% if etat.sortie %}fait{% elif etat.etape == 'sortie' %}actuel{% endif %}"><strong>Sortie</strong>
+        {% if etat.sortie %}<span>✔ {{ etat.sortie.horodatage|time:"H:i:s" }}</span>
+        {% elif etat.sortie_possible_a %}<span>à partir de {{ etat.sortie_possible_a|time:"H:i:s" }}</span>
+        {% else %}<span>{{ heures_journee|floatformat:"-1" }} h après l'entrée</span>{% endif %}</li>
+    </ol>
+
+    {% if etat.etape == "termine" %}
+      <div class="resultat ok"><div class="icone">✔</div><div class="texte">Journée terminée. À demain !</div></div>
+    {% elif etat.etape == "attente" %}
+      <div class="resultat"><div class="icone">⏳</div>
+        <div class="texte">Sortie possible à partir de {{ etat.sortie_possible_a|time:"H:i:s" }}</div>
+        <div class="detail">Encore <strong id="reste">…</strong> — la caméra s'ouvrira toute seule.</div></div>
+      <span id="sortie-possible" data-ms="{{ etat.sortie_possible_a|date:'U' }}000" hidden></span>
+    {% else %}
     <div class="camera lecteur" style="margin-top:12px">
       <video id="video" autoplay playsinline muted></video>
       <div class="viseur" aria-hidden="true"></div>
@@ -14,9 +30,23 @@
         <button type="button" id="reessayer" class="petit">Réessayer</button></div></div>
     </div>
     <p class="aide" style="text-align:center">Visez le QR code affiché au bureau : il est lu tout seul.</p>
+    {% endif %}
   </section>
   <p style="text-align:center"><a href="{% url 'mon_espace' %}">Voir mes heures →</a></p>
 </div>
+{% if etat.etape == "attente" %}
+<script nonce="{{ request.csp_nonce }}">
+(() => {
+  const cible = Number(document.getElementById("sortie-possible").dataset.ms) + 1500;
+  const tic = () => {
+    const s = Math.max(0, Math.round((cible - Date.now()) / 1000));
+    document.getElementById("reste").textContent = Math.floor(s / 3600) + " h " + String(Math.floor(s % 3600 / 60)).padStart(2, "0") + " min " + String(s % 60).padStart(2, "0") + " s";
+    if (s <= 0) location.reload();
+  };
+  tic(); setInterval(tic, 1000);
+})();
+</script>
+{% elif etat.etape != "termine" %}
 <script src="{% static 'pointage/jsQR.js' %}"></script>
 <script nonce="{{ request.csp_nonce }}">
 (() => {
@@ -93,4 +123,5 @@
   demarrer();
 })();
 </script>
+{% endif %}
 {% endblock %}

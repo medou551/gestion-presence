@@ -13,10 +13,6 @@
         <div class="texte" id="texte">Enregistrement…</div>
         <div class="detail" id="detail"></div>
         {% if lieux %}<div class="etat-position" id="etat-position">Vérification de votre position…</div>{% endif %}
-        <div id="zone-confirmer" hidden>
-          <button class="gros" id="confirmer" type="button">Oui, je sors maintenant</button>
-          <a class="bouton secondaire" href="{% url 'mon_espace' %}" style="margin-top:10px">Non, annuler</a>
-        </div>
       </div>
     {% endif %}
   </section>
@@ -37,17 +33,15 @@
     el("icone").textContent = icone; el("texte").textContent = texte; el("detail").textContent = detail || "";
   }
 
-  async function envoyer(confirmer) {
-    el("zone-confirmer").hidden = true;
+  async function envoyer() {
     afficher("", "⏳", "Enregistrement…");
     const f = new FormData();
-    if (confirmer) f.append("confirmer", "1");
     if (position) { f.append("latitude", position.lat); f.append("longitude", position.lon); f.append("precision", position.precision); }
     try {
       const r = await fetch("{% url 'scan_valider' code %}", { method: "POST", body: f, headers: { "X-CSRFToken": "{{ csrf_token }}" }, credentials: "same-origin" });
       if (r.redirected || !(r.headers.get("content-type") || "").includes("json")) { location.reload(); return; }
       const d = await r.json();
-      if (d.confirmer) { afficher("", "⚠", d.message); el("zone-confirmer").hidden = false; return; }
+      if (d.attente) { afficher("", "⏳", d.message); return; }
       if (d.ok) { afficher("ok", "✔", d.message, d.detail); if (navigator.vibrate) navigator.vibrate(120); }
       else afficher("erreur", "✖", d.message);
     } catch (e) {
@@ -55,12 +49,11 @@
     }
   }
 
-  el("confirmer").addEventListener("click", () => envoyer(true));
 
-  if (!lieux.length) { envoyer(false); return; }
+  if (!lieux.length) { envoyer(); return; }
   // Position (si un lieu est défini) : elle doit être dans la zone autorisée
   Position.meilleure(12000, 15, m => { el("etat-position").textContent = "Position : précision " + Math.round(m.precision) + " m…"; })
-    .then(m => { position = m; el("etat-position").hidden = true; envoyer(false); })
+    .then(m => { position = m; el("etat-position").hidden = true; envoyer(); })
     .catch(e => afficher("erreur", "✖", e.message));
 })();
 </script>

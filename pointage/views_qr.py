@@ -17,11 +17,30 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .models import Pointage, Tablette, heures_supplementaires, resume_journee
+from .models import Pointage, Tablette, heures_supplementaires
 from .roles import ADMIN, EMPLOYE, employe_du_compte, journaliser, role_de, role_requis
 
 COOKIE_TABLETTE = "tablette_alygo"
 SEL_QR = "pointage.qr"
+
+
+def etat_du_jour(emp, maintenant=None):
+    """Règle : deux scans par jour. 1) entrée ; 2) sortie, seulement après HEURES_JOURNEE (8 h 00 min) de travail.
+    Retourne un dictionnaire : etape ("entree" | "attente" | "sortie" | "termine"), entree, sortie, sortie_possible_a."""
+    from datetime import datetime, time, timedelta
+    maintenant = maintenant or timezone.now()
+    debut = timezone.make_aware(datetime.combine(timezone.localdate(maintenant), time.min))
+    du_jour = list(emp.pointages.filter(horodatage__gte=debut, horodatage__lte=maintenant).order_by("horodatage"))
+    entree = next((p for p in du_jour if p.type == Pointage.ENTREE), None)
+    sortie = next((p for p in du_jour if p.type == Pointage.SORTIE and entree and p.horodatage > entree.horodatage), None)
+    if not entree:
+        return {"etape": "entree", "entree": None, "sortie": None, "sortie_possible_a": None}
+    possible = entree.horodatage + timedelta(hours=settings.HEURES_JOURNEE)
+    if sortie:
+        etape = "termine"
+    else:
+        etape = "sortie" if maintenant >= possible else "attente"
+    return {"etape": etape, "entree": entree, "sortie": sortie, "sortie_possible_a": possible}
 
 
 def _duree_lisible(secondes):
@@ -82,7 +101,7 @@ def tablette(request):
         return render(request, "pointage/tablette_inactive.html", status=403)
     return render(request, "pointage/tablette.html", {
         "tablette": t, "serveur_ms": int(timezone.now().timestamp() * 1000), "fuseau": settings.TIME_ZONE,
-        "renouvellement": settings.QR_RENOUVELLEMENT_SECONDES,
+        "renouvellement": settings.QR_RENOUVELLEMENT_SECONDES, "heures_journee": f"{settings.HEURES_JOURNEE:g}",
     })
 
 
@@ -91,7 +110,7 @@ def qr_admin(request):
     """Le QR code affiché directement dans l'espace administrateur (même écran que la tablette)."""
     return render(request, "pointage/tablette.html", {
         "mode_admin": True, "serveur_ms": int(timezone.now().timestamp() * 1000), "fuseau": settings.TIME_ZONE,
-        "renouvellement": settings.QR_RENOUVELLEMENT_SECONDES,
+        "renouvellement": settings.QR_RENOUVELLEMENT_SECONDES, "heures_journee": f"{settings.HEURES_JOURNEE:g}",
     })
 
 
@@ -139,12 +158,8 @@ def _lire_code(code, marge=0):
 def scanner(request):
     """Lecteur de QR code intégré à l'application (caméra arrière du téléphone)."""
     emp = employe_du_compte(request.user)
-    dernier = emp.dernier_pointage() if emp else None
-    aujourdhui = timezone.localdate()
-    prochain = "sortie" if (dernier and timezone.localtime(dernier.horodatage).date() == aujourdhui
-                            and dernier.type == Pointage.ENTREE) else "entrée"
-    return render(request, "pointage/scanner.html", {"employe": emp, "prochain": prochain,
-                  "dernier": dernier if dernier and timezone.localtime(dernier.horodatage).date() == aujourdhui else None})
+    etat = etat_du_jour(emp) if emp else {"etape": "entree"}
+    return render(request, "pointage/scanner.html", {"employe": emp, "etat": etat, "heures_journee": settings.HEURES_JOURNEE})
 
 
 @role_requis(EMPLOYE)
@@ -193,20 +208,20 @@ def scan_valider(request, code):
         return JsonResponse({"ok": False, "message": f"Déjà pointé à {timezone.localtime(dernier.horodatage):%H:%M:%S}."},
                             status=429)
 
-    meme_jour = dernier and timezone.localtime(dernier.horodatage).date() == timezone.localdate()
-    type_ = Pointage.SORTIE if (meme_jour and dernier.type == Pointage.ENTREE) else Pointage.ENTREE
-
-    travaille = 0
-    if type_ == Pointage.SORTIE:
-        _, _, travaille, ouvert = resume_journee(emp, timezone.localdate())
-        if ouvert:
-            travaille += (maintenant - ouvert).total_seconds()
-        if travaille < settings.HEURES_JOURNEE * 3600 and request.POST.get("confirmer") != "1":
-            return JsonResponse({
-                "ok": False, "confirmer": True,
-                "message": f"Vous avez travaillé {_duree_lisible(travaille)} aujourd'hui, moins de "
-                           f"{settings.HEURES_JOURNEE:g} h. Confirmez-vous votre sortie ?",
-            })
+    # Deux scans par jour : entrée, puis sortie après 8 h 00 min de travail
+    etat = etat_du_jour(emp, maintenant)
+    if etat["etape"] == "termine":
+        return JsonResponse({"ok": False, "message": (
+            f"Journée terminée : entrée à {timezone.localtime(etat['entree'].horodatage):%H:%M:%S}, "
+            f"sortie à {timezone.localtime(etat['sortie'].horodatage):%H:%M:%S}. À demain !")}, status=409)
+    if etat["etape"] == "attente":
+        reste = (etat["sortie_possible_a"] - maintenant).total_seconds()
+        return JsonResponse({"ok": False, "attente": True, "message": (
+            f"Sortie possible à partir de {timezone.localtime(etat['sortie_possible_a']):%H:%M:%S} "
+            f"({settings.HEURES_JOURNEE:g} h après votre entrée à {timezone.localtime(etat['entree'].horodatage):%H:%M:%S}). "
+            f"Encore {_duree_lisible(reste + 59)}.")}, status=409)
+    type_ = Pointage.ENTREE if etat["etape"] == "entree" else Pointage.SORTIE
+    travaille = (maintenant - etat["entree"].horodatage).total_seconds() if type_ == Pointage.SORTIE else 0
 
     p = Pointage.objects.create(employe=emp, type=type_, horodatage=maintenant, source=Pointage.QR,
                                 adresse_ip=request.META.get("REMOTE_ADDR"), lieu=lieu, distance_lieu_m=distance_lieu)

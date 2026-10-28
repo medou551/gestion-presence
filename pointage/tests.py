@@ -917,17 +917,27 @@ class QrTests(Base):
         if timezone.localtime(Pointage.objects.filter(type="E").get().horodatage).date() == timezone.localdate():
             self.assertContains(self.client.get("/tableau/"), "+01:30:00")
 
-    def test_sortie_avant_8h_demande_confirmation(self):
+    def test_deux_scans_par_jour_sortie_apres_8h(self):
         self.employe()
-        self.scanner(self.code())
+        self.assertEqual(self.scanner(self.code()).json()["type"], "Entrée")
+        # 3 h après l'entrée : sortie refusée, avec l'heure à partir de laquelle elle est possible
         Pointage.objects.update(horodatage=timezone.now() - timedelta(hours=3))
-        code = self.code()
-        r = self.scanner(code)
-        self.assertTrue(r.json()["confirmer"])
+        r = self.scanner(self.code())
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("Sortie possible à partir de", r.json()["message"])
         self.assertEqual(Pointage.objects.count(), 1)
-        r = self.scanner(code, confirmer="1")
-        self.assertTrue(r.json()["ok"])
-        self.assertEqual(Pointage.objects.filter(type="S").count(), 1)
+        self.assertContains(self.client.get("/scanner/"), "Sortie possible à partir de")
+        # 8 h 00 min pile : sortie acceptée
+        Pointage.objects.update(horodatage=timezone.now() - timedelta(hours=8, seconds=1))
+        r = self.scanner(self.code())
+        self.assertEqual(r.json()["type"], "Sortie")
+        # 3e scan du jour : refusé
+        Pointage.objects.filter(type="S").update(horodatage=timezone.now() - timedelta(minutes=5))
+        r = self.scanner(self.code())
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("Journée terminée", r.json()["message"])
+        self.assertEqual(Pointage.objects.count(), 2)
+        self.assertContains(self.client.get("/scanner/"), "Journée terminée")
 
     def test_qr_expire_ou_falsifie_refuse(self):
         self.employe()
@@ -995,7 +1005,7 @@ class ScannerTests(Base):
         self.connecter(Profil.EMPLOYE, employe=self.ali)
         r = self.client.get("/scanner/")
         self.assertContains(r, "jsQR.js")
-        self.assertContains(r, "Prochain : <strong>entrée</strong>", html=False)
+        self.assertContains(r, "à scanner maintenant")
         self.client.logout()
         self.connecter(Profil.ADMIN)
         self.assertEqual(self.client.get("/scanner/").status_code, 403)
