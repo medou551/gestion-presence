@@ -23,7 +23,7 @@
     <!-- 1. Un seul bouton -->
     <div id="ecran-depart">
       <button class="gros" id="commencer">📷 Pointer mon {{ prochain|lower }}</button>
-      <p class="aide" style="text-align:center">Appuyez, puis regardez simplement l'écran : la photo est prise toute seule.</p>
+      <p class="aide" style="text-align:center">Appuyez, puis regardez l'écran : la photo se prend toute seule dès que votre visage est vu.</p>
     </div>
 
     <!-- 2. Caméra avec guidage -->
@@ -36,6 +36,7 @@
         <div class="aucune" id="pas-camera" hidden><div><strong>Caméra indisponible</strong><p id="pas-camera-detail"></p>
           <button type="button" id="reessayer-camera" class="petit">Réessayer</button> <a href="{% url 'diagnostic' %}" class="lien-clair">Diagnostic</a></div></div>
       </div>
+      <button class="gros" id="declencher" type="button">📸 Prendre la photo</button>
       {% if lieux %}<div class="etat-position" id="etat-position">Recherche de votre position…</div>{% endif %}
     </div>
 
@@ -73,8 +74,8 @@
   const video = el("video"), figee = el("figee"), ovale = el("ovale"), consigne = el("consigne");
   const csrf = "{{ csrf_token }}";
   const lieux = JSON.parse(el("donnees-lieux").textContent), PRECISION_MAX = {{ precision_max }};
-  const BONNES_IMAGES = 3;          // visage bien placé sur 3 analyses de suite (≈ 1 s) avant la photo
-  let enCours = false, position = null, positionOk = lieux.length === 0, bonnes = 0, debut = 0;
+  let enCours = false, envoi = false, position = null, positionOk = lieux.length === 0, debut = 0;
+  let positionPromesse = null;
 
   // On charge la reconnaissance dès l'ouverture de la page, pour gagner du temps
   const chargement = Visage.charger("{% static 'pointage/faceapi/modeles' %}");
@@ -91,24 +92,28 @@
     return { lieu: proche, distance: d };
   }
   function afficherPosition(m) {
-    const e = el("etat-position"); if (!e) return;
+    const e = el("etat-position"); if (!e) return null;
     const s = situer(m), dans = s.distance <= s.lieu.rayon, precis = m.precision <= PRECISION_MAX;
     positionOk = dans && precis;
     position = m;
-    e.textContent = (positionOk ? "✔ Vous êtes à " : "✖ Vous êtes à ") + Math.round(s.distance) + " m de " + s.lieu.nom
+    const texte = (dans ? "Vous êtes à " : "Vous êtes à ") + Math.round(s.distance) + " m de " + s.lieu.nom
       + (dans ? "" : " — il faut être à moins de " + s.lieu.rayon + " m")
-      + (precis ? "" : " — GPS imprécis (" + Math.round(m.precision) + " m), activez la localisation précise");
+      + (precis ? "" : " — GPS imprécis (" + Math.round(m.precision) + " m) : activez la localisation précise, près d'une fenêtre");
+    e.textContent = (positionOk ? "✔ " : "✖ ") + texte;
     e.className = "etat-position " + (positionOk ? "ok" : "erreur");
+    return texte;
   }
   function suivrePosition() {
-    if (!lieux.length) return;
-    Position.meilleure(15000, 10, afficherPosition).then(afficherPosition)
-      .catch(e => { const x = el("etat-position"); x.textContent = e.message; x.className = "etat-position erreur"; });
+    if (!lieux.length) return Promise.resolve();
+    positionPromesse = Position.meilleure(15000, 10, afficherPosition).then(afficherPosition)
+      .catch(e => { const x = el("etat-position"); x.textContent = e.message; x.className = "etat-position erreur"; throw e; });
+    positionPromesse.catch(() => {});
+    return positionPromesse;
   }
 
   // ---------- Écrans ----------
   function montrerResultat(ok, texte, peutReessayer) {
-    enCours = false;
+    enCours = false; envoi = false;
     if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
     video.srcObject = null;
     el("ecran-camera").hidden = true;
@@ -122,6 +127,7 @@
   async function commencer() {
     el("ecran-depart").hidden = true; el("resultat").hidden = true; el("ecran-camera").hidden = false;
     figee.hidden = true; video.hidden = false; el("pas-camera").hidden = true;
+    el("declencher").disabled = true;
     dire("Ouverture de la caméra…");
     suivrePosition();
     try { await Visage.ouvrirCamera(video); }
@@ -129,48 +135,50 @@
     dire("Préparation de la reconnaissance…");
     try { await chargement; }
     catch (e) { montrerResultat(false, (e && e.message) || "Impossible de charger la reconnaissance faciale. Rechargez la page.", true); return; }
-    enCours = true; bonnes = 0; debut = Date.now();
+    enCours = true; envoi = false; debut = Date.now();
+    el("declencher").disabled = false;
+    dire("Regardez l'écran");
     boucle();
   }
 
-  // ---------- Guidage en direct, puis photo automatique ----------
-  async function boucle() {
-    if (!enCours) return;
-    let g;
-    try { g = await Visage.guider(video); } catch (e) { g = { etat: "aucun", message: "Placez votre visage dans l'ovale" }; }
-    if (!enCours) return;
-    if (g.etat === "ok") {
-      bonnes += 1;
-      if (!positionOk) {
-        dire(lieux.length && !position ? "Visage OK — recherche de votre position…" : "Visage OK — mais vous n'êtes pas dans la zone autorisée", "presque");
-      } else if (bonnes >= BONNES_IMAGES) {
-        dire("📸 Photo !", "bon");
-        return envoyer();
-      } else {
-        dire(g.message, "bon");
-      }
-    } else {
-      bonnes = 0;
-      const astuce = Date.now() - debut > 20000 ? " (lumière de face, sans lunettes de soleil ni casquette)" : "";
-      dire(g.message + astuce, g.etat === "aucun" ? "" : "presque");
-    }
-    setTimeout(boucle, 150);
+  // ---------- Photo automatique : dès qu'UN visage est reconnu dans l'image ----------
+  function conseil(a) {
+    if (/Plusieurs/.test(a.message)) return "Une seule personne devant la caméra";
+    if (/loin/.test(a.message)) return "Rapprochez un peu le téléphone";
+    return Date.now() - debut > 8000 ? "Visage face à l'écran, avec de la lumière devant vous" : "Regardez l'écran";
   }
 
-  async function envoyer() {
-    enCours = false;
+  async function essayer(manuel) {
+    if (!enCours || envoi) return;
     const canvas = Visage.capturer(video);
+    let a;
+    try { a = await Visage.analyser(canvas); } catch (e) { a = { ok: false, message: "" }; }
+    if (!enCours || envoi) return;
+    if (a.ok) return envoyer(canvas, a);
+    dire(manuel ? "Visage non trouvé sur la photo : " + conseil(a).toLowerCase() : conseil(a), a.message ? "presque" : "");
+  }
+
+  async function boucle() {
+    while (enCours && !envoi) {
+      await essayer(false);
+      await new Promise(r => setTimeout(r, 120));
+    }
+  }
+
+  async function envoyer(canvas, analyse) {
+    envoi = true;
     figee.src = canvas.toDataURL("image/jpeg", 0.9); figee.hidden = false; video.hidden = true;
-    dire("Vérification…", "bon");
+    el("declencher").disabled = true;
+    dire("📸 Photo prise", "bon");
     try {
-      const analyse = await Visage.analyser(canvas);
-      if (!analyse.ok) {   // visage flou au moment de la photo : on recommence tout seul
-        figee.hidden = true; video.hidden = false; enCours = true; bonnes = 0;
-        return boucle();
+      if (lieux.length) {
+        if (!position) {
+          dire("Photo prise — recherche de votre position…", "bon");
+          try { await positionPromesse; } catch (e) { return montrerResultat(false, e.message, true); }
+        }
+        if (!positionOk) return montrerResultat(false, afficherPosition(position), true);
       }
-      if (lieux.length) {  // position la plus récente possible pour le serveur
-        try { afficherPosition(await Position.meilleure(4000, 10)); } catch (e) { /* on garde la dernière */ }
-      }
+      dire("Vérification…", "bon");
       const f = new FormData();
       f.append("descripteur", JSON.stringify(analyse.descripteur));
       f.append("photo", await Visage.enJpeg(canvas), "pointage.jpg");
@@ -188,6 +196,7 @@
     }
   }
 
+  el("declencher").addEventListener("click", () => essayer(true));
   el("commencer").addEventListener("click", commencer);
   el("reessayer").addEventListener("click", commencer);
   el("reessayer-camera").addEventListener("click", commencer);

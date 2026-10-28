@@ -133,7 +133,8 @@ window.Visage = (() => {
   }
 
   function optionsDetection() {
-    return new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 });
+    // 0.4 : trouve aussi les visages un peu sombres ou de biais (l'identité est ensuite vérifiée par le serveur)
+    return new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 });
   }
 
   /* Fait tourner une fois les 3 réseaux sur une image vide : la première vraie analyse est ensuite
@@ -193,35 +194,6 @@ window.Visage = (() => {
     return { ok: true, descripteur: Array.from(v.descriptor), score: v.detection.score };
   }
 
-  /* Guidage en direct (rapide) : où est le visage dans l'image de la caméra ?
-     Retourne { etat, message } avec etat = "aucun" | "plusieurs" | "loin" | "pres" | "decentre" | "sombre" | "ok". */
-  const petit = document.createElement("canvas");
-  async function guider(video) {
-    const lv = video.videoWidth, hv = video.videoHeight;
-    if (!lv || !hv) return { etat: "aucun", message: "Ouverture de la caméra…" };
-    petit.width = 320; petit.height = Math.round(320 * hv / lv);
-    const g = petit.getContext("2d", { willReadFrequently: true });
-    g.drawImage(video, 0, 0, petit.width, petit.height);
-    // Luminosité moyenne (échantillon au centre)
-    const d = g.getImageData(petit.width * 0.3, petit.height * 0.2, petit.width * 0.4, petit.height * 0.6).data;
-    let somme = 0;
-    for (let i = 0; i < d.length; i += 16) somme += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    const lumiere = somme / (d.length / 16);
-    const visages = await faceapi.detectAllFaces(petit, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.45 }));
-    if (visages.length === 0) {
-      return lumiere < 45 ? { etat: "sombre", message: "Pas assez de lumière : mettez-vous face à une lumière." }
-                          : { etat: "aucun", message: "Placez votre visage dans l'ovale" };
-    }
-    if (visages.length > 1) return { etat: "plusieurs", message: "Une seule personne devant la caméra" };
-    const b = visages[0].box, cx = (b.x + b.width / 2) / petit.width, cy = (b.y + b.height / 2) / petit.height;
-    const taille = b.width / petit.width;
-    if (taille < 0.2) return { etat: "loin", message: "Rapprochez le téléphone de votre visage" };
-    if (taille > 0.75) return { etat: "pres", message: "Éloignez un peu le téléphone" };
-    if (cx < 0.3 || cx > 0.7 || cy < 0.22 || cy > 0.78) return { etat: "decentre", message: "Centrez votre visage dans l'ovale" };
-    if (lumiere < 45) return { etat: "sombre", message: "Pas assez de lumière : mettez-vous face à une lumière." };
-    return { etat: "ok", message: "Parfait, ne bougez pas…" };
-  }
-
   /* Copie l'image courante de la vidéo dans un canvas. */
   function capturer(video) {
     const c = document.createElement("canvas");
@@ -256,7 +228,7 @@ window.Visage = (() => {
   }
 
   return {
-    charger, analyser, guider, capturer, canvasDepuisImage, enJpeg, ouvrirCamera,
+    charger, analyser, capturer, canvasDepuisImage, enJpeg, ouvrirCamera,
     compatibilite, problemeAvantCamera, navigateur, libelleMoteur,
     get moteur() { return moteur; },
   };
