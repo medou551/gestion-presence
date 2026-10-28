@@ -12,8 +12,10 @@ urlpatterns = [
     path("sans-role/", views.aucun_role, name="aucun_role"),
     path("diagnostic/", views.diagnostic, name="diagnostic"),
 
-    # Poste de pointage commun (administrateur uniquement)
-    path("", views.borne, name="borne"),
+    # Page d'accueil : chacun est envoyé vers sa page (connexion, tableau de bord, lecteur de QR code)
+    path("", views_auth.accueil, name="racine"),
+    # Ancien poste de pointage par visage : retiré (POSTE_POINTAGE=False par défaut)
+    path("poste/", views.borne, name="borne"),
     path("pointer/", views.pointer, name="pointer"),
 
     # Pointage par QR code : la tablette l'affiche, l'employé le scanne avec son téléphone

@@ -30,7 +30,7 @@ Chaque employé a une photo de référence ; à chaque pointage, son téléphone
 **Rôles**
 | Rôle | Accès |
 |---|---|
-| Administrateur | Tout : comptes, services, employés, lieux, tableau, corrections, exports, journal d'audit, poste de pointage |
+| Administrateur | Tout : comptes, services, employés, lieux, tableau, corrections, exports, journal d'audit, affichage du QR code |
 | Utilisateur (employé) | Pointer avec son téléphone (sur le lieu de travail), son historique, ses données |
 
 Identité visuelle **AlyGo** (logo, jaune et noir) ; l'application peut être ajoutée à l'écran d'accueil du téléphone.
@@ -61,7 +61,7 @@ python manage.py initialiser     # base de données + compte administrateur
 python serveur.py                # ou : python manage.py runserver
 ```
 
-Ouvrez **http://127.0.0.1:8000/** (bien `http://`, pas `https://`). L'administrateur peut tester avec le menu « Poste de pointage ».
+Ouvrez **http://127.0.0.1:8000/** (bien `http://`, pas `https://`). L'administrateur affiche le QR code avec le menu « QR code ».
 En local, la caméra fonctionne sur `127.0.0.1` / `localhost` sans HTTPS.
 
 **La base de données** est SQLite : un seul fichier, `db.sqlite3`, **rien à installer**. La commande `initialiser`

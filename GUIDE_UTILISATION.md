@@ -140,11 +140,11 @@ Notez l'identifiant et le mot de passe temporaire affichés et donnez-les à l'e
 
 Dans le tableau de bord, ces pointages portent l'étiquette **📱 Téléphone** avec la distance au lieu.
 
-## Le poste de pointage (administrateur)
+## Employé sans téléphone ou départ anticipé
 
-Le menu **Poste de pointage** ouvre la page où l'on choisit un nom puis on vérifie le visage, sur l'appareil de
-l'administrateur. Utile si le téléphone d'un employé est en panne : l'administrateur reste à côté, puis se déconnecte.
-Ne laissez jamais un appareil connecté en administrateur sans surveillance.
+Il n'y a plus de « poste de pointage » : tout se fait par QR code. Si un employé ne peut pas scanner (téléphone oublié
+ou en panne) ou doit partir avant 8 h, l'administrateur ajoute l'heure dans le **tableau de bord** →
+**Corriger un oubli**, avec le motif. La ligne est marquée « Manuel » et enregistrée dans le Journal.
 
 ## Mot de passe oublié
 

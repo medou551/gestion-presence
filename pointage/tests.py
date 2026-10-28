@@ -42,7 +42,8 @@ ALI, FATOU, OUMAR = signature(1), signature(2), signature(3)
 
 
 REGLAGES = dict(MEDIA_ROOT=MEDIA_TEST, DOSSIER_SAUVEGARDES=SAUV_TEST, POINTAGE_DELAI_MIN_SECONDES=60,
-                SEUIL_RECONNAISSANCE=0.5, SEUIL_DOUBLON=0.02, DUREE_CONSERVATION_PHOTOS_JOURS=30)
+                SEUIL_RECONNAISSANCE=0.5, SEUIL_DOUBLON=0.02, DUREE_CONSERVATION_PHOTOS_JOURS=30,
+                POSTE_POINTAGE=True)
 
 
 class Donnees:
@@ -157,7 +158,7 @@ class PointageTests(Base):
         self.assertEqual(self.pointer(self.fatou, variante(FATOU, graine=3), pin="1234").status_code, 200)
 
     def test_borne_ne_divulgue_aucun_secret(self):
-        r = self.client.get("/")
+        r = self.client.get("/poste/")
         self.assertContains(r, "Ali Ould Ahmed")
         self.assertNotContains(r, "pbkdf2")
         self.assertNotContains(r, self.ali.descripteur_chiffre[:20])
@@ -177,14 +178,14 @@ class RolesTests(Base):
     def test_seul_l_admin_ouvre_le_poste_de_pointage(self):
         self.connecter(Profil.EMPLOYE, employe=self.ali)
         self.assertEqual(self.pointer(self.ali, variante(ALI)).status_code, 403)
-        self.assertEqual(self.client.get("/").status_code, 403)
+        self.assertEqual(self.client.get("/poste/").status_code, 403)
 
     def test_matrice_des_acces(self):
         attendu = {
             Profil.EMPLOYE: {"/tableau/": 403, "/employes/": 403, "/comptes/": 403, "/audit/": 403, "/lieux/": 403,
-                             "/export/": 403, "/": 403, "/mon-espace/": 200, "/pointer-telephone/": 200},
+                             "/export/": 403, "/poste/": 403, "/mon-espace/": 200, "/pointer-telephone/": 200},
             Profil.ADMIN:   {"/tableau/": 200, "/employes/": 200, "/comptes/": 200, "/audit/": 200, "/lieux/": 200,
-                             "/": 200, "/mon-espace/": 403, "/pointer-telephone/": 403},
+                             "/poste/": 200, "/mon-espace/": 403, "/pointer-telephone/": 403},
         }
         for role, pages in attendu.items():
             self.client.logout()
@@ -206,7 +207,7 @@ class RolesTests(Base):
             u = User.objects.create_user(f"ancien.{ancien}", password="MotDePasse-Solide-1")
             Profil.objects.create(utilisateur=u, role=ancien, service=self.compta, doit_changer_mdp=False)
             self.client.force_login(u)
-            for url in ("/", "/tableau/", "/employes/", "/mon-espace/", "/pointer-telephone/"):
+            for url in ("/poste/", "/tableau/", "/employes/", "/mon-espace/", "/pointer-telephone/"):
                 self.assertEqual(self.client.get(url).status_code, 403, f"{ancien} {url}")
 
     def test_admin_django_reserve_a_l_administrateur(self):
@@ -673,7 +674,7 @@ class CompatibiliteTests(Base):
 
     def test_pages_camera_utilisent_le_module_compatible(self):
         self.connecter(Profil.ADMIN)
-        for url in ("/", "/employes/"):
+        for url in ("/poste/", "/employes/"):
             r = self.client.get(url)
             self.assertContains(r, "Visage.ouvrirCamera")
             self.assertNotContains(r, "navigator.mediaDevices.getUserMedia")
@@ -1009,3 +1010,13 @@ class ScannerTests(Base):
         self.client.logout()
         self.connecter(Profil.ADMIN)
         self.assertEqual(self.client.get("/scanner/").status_code, 403)
+
+
+class PosteRetireTests(Base):
+    @override_settings(POSTE_POINTAGE=False)
+    def test_poste_de_pointage_retire(self):
+        self.connecter(Profil.ADMIN)
+        self.assertNotContains(self.client.get("/tableau/"), "Poste de pointage")
+        self.assertEqual(self.client.get("/poste/").status_code, 404)
+        self.assertEqual(self.pointer(self.ali, variante(ALI)).status_code, 404)
+        self.assertEqual(self.client.get("/")["Location"], "/tableau/")

@@ -240,6 +240,8 @@ CONNEXION_BLOCAGE_MINUTES = 15             # …le compte et l'adresse sont bloq
 
 # Délai minimum entre deux pointages d'un même employé (évite les doubles clics)
 POINTAGE_DELAI_MIN_SECONDES = 60
+# Ancien « poste de pointage » (visage, choix du nom) : retiré de l'administration, désactivé par défaut
+POSTE_POINTAGE = env_bool("POSTE_POINTAGE", False)
 # Pointage depuis le téléphone de l'employé (compte « Employé » + vérification du visage)
 POINTAGE_TELEPHONE = env_bool("POINTAGE_TELEPHONE", False)  # par défaut : pointage par QR code
 # Réseaux autorisés pour ce pointage, ex. « 41.188.10.25 » (adresse publique du bureau) ou « 192.168.1.0/24 ».

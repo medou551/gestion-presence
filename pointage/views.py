@@ -72,7 +72,9 @@ def _bornes_jour(jour):
 
 @role_requis(ADMIN)
 def borne(request):
-    """Pointage sur un poste commun, ouvert par l'administrateur (ex. téléphone d'un employé en panne)."""
+    """Ancien poste de pointage par visage (désactivé par défaut : le pointage se fait par QR code)."""
+    if not settings.POSTE_POINTAGE:
+        raise Http404
     employes = [{"id": e.id, "nom": e.nom, "poste": e.poste, "pin": e.demande_pin, "ref": e.a_reference}
                 for e in Employe.objects.filter(actif=True)]
     return render(request, "pointage/borne.html", {
@@ -91,6 +93,8 @@ def _refus(request, emp, message, status, raison):
 @role_requis(ADMIN)
 def pointer(request):
     """Pointage sur le poste commun (administrateur) : on choisit le nom, puis le visage est vérifié."""
+    if not settings.POSTE_POINTAGE:
+        raise Http404
     employe_id = request.POST.get("employe", "").strip()
     if not employe_id.isdigit():
         return _erreur("Choisissez votre nom dans la liste.")
